@@ -1,9 +1,4 @@
-version: "3.9"
-
 services:
-  # ---------------------------------------------------
-  # 🌐 Serviço principal Flask (API / Web)
-  # ---------------------------------------------------
   flask:
     build:
       context: .
@@ -19,14 +14,12 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
-      - ./logs/flask:/app/logs/flask
+      - ./logs:/app/logs
       - ${MUSTACHE_WORKSPACE:-./workspace}:/app/workspace
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
 
-  # ---------------------------------------------------
-  # ⚙️ Serviço Celery (tarefas assíncronas)
-  # ---------------------------------------------------
   celery:
     build:
       context: .
@@ -39,14 +32,12 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
-      - ./logs/celery:/app/logs/celery
+      - ./logs:/app/logs
       - ${MUSTACHE_WORKSPACE:-./workspace}:/app/workspace
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
 
-  # ---------------------------------------------------
-  # 🧠 Serviço Redis (broker + cache)
-  # ---------------------------------------------------
   redis:
     image: redis:7.2-alpine
     container_name: mustache-redis
@@ -55,9 +46,11 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
-# ---------------------------------------------------
-# 💾 Volumes persistentes
-# ---------------------------------------------------
 volumes:
   redis_data:

@@ -26,8 +26,8 @@ hai>=0.0.6,<1.0
 # HDBSCAN (opcional, mas compatível)
 hdbscan>=0.8.28,<1.1
 
-# Matplotlib
-matplotlib>=3.4,<3.10
+matplotlib
+# matplotlib>=3.4,<3.10
 
 # mpmath
 mpmath>=1.0.0,<2.0
