@@ -1,19 +1,56 @@
 #!/bin/bash
 
-echo "Building Application.."
+# --------------------------------------------------------
+# 🚀 MustaCHE - Build Script (compose.sh)
+# --------------------------------------------------------
+
+# Parar imediatamente se houver erro
+set -e
+
+# Verificar argumento do workspace
+if [ -z "$1" ]; then
+  echo "❌ Erro: você deve informar o caminho do workspace."
+  echo "👉 Exemplo: ./compose.sh /home/usuario/mustache-workspace"
+  exit 1
+fi
+
+# --------------------------------------------------------
+# 🌍 Variáveis de ambiente
+# --------------------------------------------------------
 export COMPOSE_PROJECT_NAME=mustache
 export MUSTACHE_WORKSPACE=$1
 
-mkdir -p $1
-chmod -R a+rwx $1
+echo "📦 Iniciando build do projeto MustaCHE..."
+echo "🗂️  Workspace: $MUSTACHE_WORKSPACE"
+echo "------------------------------------------------------"
 
-> run.sh
-echo "#!/bin/bash" >> run.sh
-echo "export COMPOSE_PROJECT_NAME=mustache" >> run.sh
-echo "export MUSTACHE_WORKSPACE=$1" >> run.sh
-echo "docker-compose up -d" >> run.sh
-echo "sleep 3" >> run.sh
+# --------------------------------------------------------
+# 🏗️ Preparar diretórios locais
+# --------------------------------------------------------
+mkdir -p "$MUSTACHE_WORKSPACE"
+mkdir -p logs/flask logs/celery
+chmod -R a+rwx "$MUSTACHE_WORKSPACE" logs
+
+# --------------------------------------------------------
+# ⚙️ Gerar o script run.sh atualizado
+# --------------------------------------------------------
+cat <<EOF > run.sh
+#!/bin/bash
+set -e
+export COMPOSE_PROJECT_NAME=mustache
+export MUSTACHE_WORKSPACE=$MUSTACHE_WORKSPACE
+echo "🚀 Subindo containers do MustaCHE..."
+docker compose up -d
+echo "✅ Containers iniciados com sucesso!"
+EOF
 
 chmod +x run.sh
 
-docker-compose build --compress
+# --------------------------------------------------------
+# 🧱 Construir a aplicação
+# --------------------------------------------------------
+echo "🔧 Construindo imagens Docker..."
+docker compose build --no-cache --compress
+
+echo "✅ Build concluído!"
+echo "👉 Para iniciar o projeto, execute: ./run.sh"

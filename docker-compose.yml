@@ -1,36 +1,63 @@
-version: '2'
+version: "3.9"
 
 services:
-
+  # ---------------------------------------------------
+  # 🌐 Serviço principal Flask (API / Web)
+  # ---------------------------------------------------
   flask:
-    build: .
-    container_name: flask
-    command: >
-      gunicorn -b 0.0.0.0:5000
-        -w 4
-        "wsgi:app"
-    volumes:
-      - '$MUSTACHE_WORKSPACE:/app/workspace'
-      - '.:/usr/src/app:ro'
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mustache-flask
+    restart: unless-stopped
+    command: gunicorn -w 4 -b 0.0.0.0:5000 mustache:app
     ports:
-      - '5000:5000'
-    links:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - ./logs/flask:/app/logs/flask
+      - ${MUSTACHE_WORKSPACE:-./workspace}:/app/workspace
+    depends_on:
       - redis
-      - celery
 
+  # ---------------------------------------------------
+  # ⚙️ Serviço Celery (tarefas assíncronas)
+  # ---------------------------------------------------
   celery:
-    build: .
-    container_name: celery
-    command: "celery -A mustache.celery worker --loglevel=info"
-    user: nobody
-    links:
-      - redis
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mustache-celery
+    restart: unless-stopped
+    command: celery -A mustache.celery_app worker --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
-      - '$MUSTACHE_WORKSPACE:/app/workspace'
-      - '.:/usr/src/app:ro'
+      - ./logs/celery:/app/logs/celery
+      - ${MUSTACHE_WORKSPACE:-./workspace}:/app/workspace
+    depends_on:
+      - redis
 
+  # ---------------------------------------------------
+  # 🧠 Serviço Redis (broker + cache)
+  # ---------------------------------------------------
   redis:
-    container_name: redis
-    image: redis
+    image: redis:7.2-alpine
+    container_name: mustache-redis
+    restart: unless-stopped
     ports:
-      - '6378:6379'
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+# ---------------------------------------------------
+# 💾 Volumes persistentes
+# ---------------------------------------------------
+volumes:
+  redis_data:

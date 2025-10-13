@@ -2,9 +2,11 @@ from flask import Flask, request, Config
 from celery import Celery
 import uuid
 import datetime as dt
+import json
 
 app = Flask(__name__)
-app.config.from_json("settings.json")
+#app.config.from_json("settings.json")
+app.config.from_file("settings.json", load=json.load)
 app.config['SECRET_KEY'] = uuid.uuid4()
 
 

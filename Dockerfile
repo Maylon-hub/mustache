@@ -1,47 +1,51 @@
-FROM ubuntu:18.04
-USER root
+# -------------------------------------------------------
+# 🐍 Base image
+# -------------------------------------------------------
+FROM python:3.9-slim AS base
 
-RUN apt-get update && apt-get install -y \
-    python3-dev \
-    python3-pip \
-    build-essential \
-    python-dev \
-    python-pip \
-    nodejs \
-    npm
-
-RUN npm i -g nodemon
-
-ENV TZ=America/Los_Angeles
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-
-# dependancies
-RUN apt-get update && apt-get install -y \
-    default-jdk \
-    python-tk \
-    python3-tk \
-    gunicorn \
-    python-numpy
-
-# copy source
-COPY . /app
-ENV HOME=/app
-RUN chmod a+rwx app
-
-WORKDIR /app
-RUN mkdir -p workspace
-RUN chmod a+rwx workspace
-
-RUN pip3 install -r requirements.txt
-RUN pip install -r mustache/resources/requirements.txt
-RUN pip install hdbscan
-
-WORKDIR /app/mustache/resources
-RUN python setup.py build_ext --inplace
-
+ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
+# Instalar dependências do sistema (mantendo as suas originais)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        gfortran \
+        libopenblas-dev \
+        liblapack-dev \
+        default-jdk \
+        python3-dev \
+        pkg-config \
+        git \
+        curl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# EXPOSE 5000
+# Atualizar pip e ferramentas básicas
+RUN pip install --upgrade "pip<24.1" setuptools wheel
 
-# ENTRYPOINT [ "gunicorn", "-b", "0.0.0.0:5000", "-w", "4", "wsgi:app" ]
+# -------------------------------------------------------
+# 🧱 Instalar dependências Python com cache
+# -------------------------------------------------------
+COPY requirements.txt ./requirements.txt
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+# -------------------------------------------------------
+# 📦 Copiar aplicação
+# -------------------------------------------------------
+COPY . .
+
+# Criar diretórios de log
+RUN mkdir -p logs/flask logs/celery
+
+# Expor porta Flask
+EXPOSE 5000
+
+# -------------------------------------------------------
+# 🚀 Comando de inicialização
+# -------------------------------------------------------
+# Opção 1: modo desenvolvimento (igual ao seu atual)
+# CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+
+# Opção 2: modo produção (recomendado)
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "mustache:app"]
