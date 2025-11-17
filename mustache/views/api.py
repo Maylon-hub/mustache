@@ -3,12 +3,9 @@ import json
 import shutil
 import time
 import datetime as dt
-# import hdbscan
-import tkinter as tk
 import os
 import zipfile
 from io import BytesIO
-from tkinter import filedialog
 from .. import __file__ as base
 from ..tasks.tasks import process
 from ..util.helpers import rngl
@@ -21,9 +18,9 @@ def workspace():
     if request.method == "GET":
         workspace = app.config['WORKSPACE']
         if not workspace:
-            return Response('{"path":'+'"'+str(workspace)+'"'+'}', status=404, mimetype='application/json')
+            return jsonify(path=str(workspace)), 404
         else:
-            return Response('{"path":'+'"'+str(workspace)+'"'+'}', status=200, mimetype='application/json')
+            return jsonify(path=str(workspace)), 200
     if request.method == "POST":
         path = request.json['path']
         app.config['WORKSPACE'] = path
@@ -36,22 +33,6 @@ def workspace():
             json.dump(data, jfile)
 
         return Response("{}", status=200, mimetype='application/json')
-
-
-@api.route("/directory")
-def directory():
-    root = tk.Tk()
-    # root.iconbitmap(os.path.join(
-    #     os.path.dirname(base), 'static/icon/favicon.ico'))
-    root.attributes("-topmost", True)
-    root.withdraw()
-    dirStr = filedialog.askdirectory()
-    root.destroy()
-
-    if(dirStr == "" or dirStr is None):
-        return Response(status=404)
-    else:
-        return dirStr
 
 
 @api.route('/distance')
@@ -124,26 +105,33 @@ def delete(id):
 @api.route("/exportZip", methods=['GET', 'POST'])
 def export_zip():
     memory_file = BytesIO()
+    # TODO: A lógica para obter os arquivos a serem zipados precisa ser implementada.
+    # Por enquanto, estamos tratando o caso de uma lista de arquivos vazia.
+    files_to_zip = [] # Assumindo que esta lista viria da requisição ou de outro lugar
+
     with zipfile.ZipFile(memory_file, 'w') as zf:
-        files = [None]
-        for individualFile in files:
-            data = zipfile.ZipInfo(individualFile['fileName'])
-            data.date_time = time.localtime(time.time())[:6]
-            data.compress_type = zipfile.ZIP_DEFLATED
-            zf.writestr(data, individualFile['fileData'])
+        if files_to_zip:
+            for individualFile in files_to_zip:
+                data = zipfile.ZipInfo(individualFile['fileName'])
+                data.date_time = time.localtime(time.time())[:6]
+                data.compress_type = zipfile.ZIP_DEFLATED
+                zf.writestr(data, individualFile['fileData'])
     memory_file.seek(0)
-    return send_file(memory_file, attachment_filename='capsule.zip', as_attachment=True)
+    return send_file(memory_file, download_name='capsule.zip', as_attachment=True)
 
 
 @api.route("/importtZip", methods=['GET', 'POST'])
 def import_zip():
     memory_file = BytesIO()
+    # TODO: A mesma lógica de placeholder se aplica aqui.
+    files_to_zip = []
+
     with zipfile.ZipFile(memory_file, 'w') as zf:
-        files = [None]
-        for individualFile in files:
-            data = zipfile.ZipInfo(individualFile['fileName'])
-            data.date_time = time.localtime(time.time())[:6]
-            data.compress_type = zipfile.ZIP_DEFLATED
-            zf.writestr(data, individualFile['fileData'])
+        if files_to_zip:
+            for individualFile in files_to_zip:
+                data = zipfile.ZipInfo(individualFile['fileName'])
+                data.date_time = time.localtime(time.time())[:6]
+                data.compress_type = zipfile.ZIP_DEFLATED
+                zf.writestr(data, individualFile['fileData'])
     memory_file.seek(0)
-    return send_file(memory_file, attachment_filename='capsule.zip', as_attachment=True)
+    return send_file(memory_file, download_name='capsule.zip', as_attachment=True)

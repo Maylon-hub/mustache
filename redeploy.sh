@@ -1,17 +1,26 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Parando containers antigos..."
-docker compose down
+echo "🛡️ Forçando o AppArmor a descarregar todos os perfis do kernel..."
+sudo service apparmor force-reload
 
-echo "🏗️ Rebuildando imagens Docker..."
-docker compose build --no-cache
+echo "🚀 Parando e removendo quaisquer containers antigos restantes..."
+docker compose down --remove-orphans
 
-echo "📦 Subindo containers..."
-docker compose up -d
+echo "🏗️ Reconstruindo imagens Docker (usando cache se possível)..."
+docker compose build
 
-echo "📜 Exibindo últimos logs do Flask e Celery..."
-docker compose logs flask --tail=50
-docker compose logs celery --tail=50
+echo "📦 Subindo novos containers..."
+docker compose up -d --force-recreate
 
-echo "✅ Redeploy concluído! Acesse: http://localhost:5001"
+echo "🛡️ Recarregando o AppArmor para restaurar a segurança do sistema..."
+sudo systemctl restart apparmor.service
+
+echo "⏳ Aguardando os containers estabilizarem..."
+sleep 5
+
+echo "📜 Exibindo logs recentes do Flask e Celery..."
+docker compose logs --tail=50 flask
+docker compose logs --tail=50 celery
+
+echo "✅ Redeploy concluído! A aplicação deve estar acessível em http://localhost:5001"

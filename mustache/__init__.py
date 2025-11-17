@@ -7,7 +7,7 @@ import json
 app = Flask(__name__)
 #app.config.from_json("settings.json")
 app.config.from_file("settings.json", load=json.load)
-app.config['SECRET_KEY'] = uuid.uuid4()
+app.config['SECRET_KEY'] = uuid.uuid4().hex
 
 
 def format_datetime(value):

@@ -3,13 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mustache-flask
     restart: unless-stopped
     command: gunicorn -w 4 -b 0.0.0.0:5000 mustache:app
     ports:
       - "5001:5000"
     environment:
-      - FLASK_ENV=production
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -24,9 +22,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mustache-celery
     restart: unless-stopped
-    command: celery -A mustache.celery_app worker --loglevel=info
+    command: celery -A mustache.celery worker --loglevel=info
     environment:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -40,7 +37,6 @@ services:
 
   redis:
     image: redis:7.2-alpine
-    container_name: mustache-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
