@@ -37,7 +37,7 @@ def process(self, workspace, root, files, settings):
 
     root = str(os.path.dirname(root))
 
-    sh = str(os.path.join(root, 'resources/run.sh'))
+    sh = "/app/mustache/resources/run.sh"
     in_file = str(os.path.join(path, files[0]['name']))
 
     while not os.path.exists(in_file):
