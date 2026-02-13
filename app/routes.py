@@ -1,6 +1,8 @@
 from flask import Blueprint, render_template, request, jsonify
 import pandas as pd
 from .core import run_clustering
+from .core.batch import run_batch_clustering
+
 import io
 
 main = Blueprint('main', __name__)
@@ -54,3 +56,41 @@ def upload_file():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@main.route('/batch', methods=['POST'])
+def batch_process():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+        
+    try:
+        # Read CSV
+        df = pd.read_csv(file, header=None)
+        
+        # Get parameters for batch
+        min_mpts = int(request.form.get('min_mpts', 2))
+        max_mpts = int(request.form.get('max_mpts', 10)) # Default small range for testing
+        step = int(request.form.get('step', 1))
+        metric = request.form.get('metric', 'euclidean')
+        
+        # Run batch clustering
+        results = run_batch_clustering(df, min_mpts, max_mpts, step, metric=metric)
+        
+        # Run meta-analysis
+        from .core.batch import analyze_batch_results
+        analysis = analyze_batch_results(results)
+        
+        return jsonify({
+            'message': 'Batch clustering successful',
+            'range': {'min': min_mpts, 'max': max_mpts, 'step': step},
+            'results': results,
+            'analysis': analysis
+        })
+
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+

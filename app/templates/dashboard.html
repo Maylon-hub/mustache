@@ -1,9 +1,153 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="card">
-    <h2>Dashboard</h2>
-    <p>Esta página mostrará análises salvas e histórico de clustering.</p>
-    <p><em>Em desenvolvimento...</em></p>
+
+<div class="row">
+    <!-- Analysis Controls -->
+    <div class="col-md-3">
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-cogs"></i> Analysis Settings
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs mb-3" id="modeTab" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="single-tab" data-toggle="tab" href="#single"
+                            role="tab">Single</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="batch-tab" data-toggle="tab" href="#batch" role="tab">Batch (HAI)</a>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="modeTabContent">
+                    <!-- Single Mode -->
+                    <div class="tab-pane fade show active" id="single" role="tabpanel">
+                        <form id="upload-form" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label>Dataset (CSV)</label>
+                                <input type="file" class="form-control-file" name="file" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Labels (Optional)</label>
+                                <input type="file" class="form-control-file" name="labels_file">
+                            </div>
+                            <hr>
+                            <div class="form-group">
+                                <label>Min Cluster Size</label>
+                                <input type="number" class="form-control" name="min_cluster_size" value="5" min="2">
+                            </div>
+                            <div class="form-group">
+                                <label>Metric</label>
+                                <select class="form-control" name="metric">
+                                    <option value="euclidean">Euclidean</option>
+                                    <option value="manhattan">Manhattan</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-block">Run HDBSCAN</button>
+                        </form>
+                    </div>
+
+                    <!-- Batch Mode -->
+                    <div class="tab-pane fade" id="batch" role="tabpanel">
+                        <form id="batch-form" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label>Dataset (CSV)</label>
+                                <input type="file" class="form-control-file" name="file" required>
+                            </div>
+                            <hr>
+                            <div class="form-group">
+                                <label>Range <code>mpts</code></label>
+                                <div class="d-flex">
+                                    <input type="number" class="form-control mr-1" name="min_mpts" placeholder="Min"
+                                        value="2" min="2">
+                                    <input type="number" class="form-control ml-1" name="max_mpts" placeholder="Max"
+                                        value="10">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Step</label>
+                                <input type="number" class="form-control" name="step" value="1" min="1">
+                            </div>
+                            <button type="submit" class="btn btn-warning btn-block">Run Batch & HAI</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Meta-Cluster Selection -->
+        <div id="meta-cluster-panel" class="card mb-3 d-none">
+            <div class="card-header bg-dark text-white">
+                <i class="fas fa-layer-group"></i> Meta-Clusters
+            </div>
+            <div class="card-body">
+                <p>Select a group to view representative hierarchy:</p>
+                <div id="meta-cluster-list" class="list-group">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Visualizations -->
+    <div class="col-md-9">
+
+        <!-- Batch Views -->
+        <div id="batch-results" class="d-none">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-3">
+                        <div class="card-header">HAI Matrix (Similarity)</div>
+                        <div class="card-body p-0">
+                            <div id="hai-heatmap" style="height: 400px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card mb-3">
+                        <div class="card-header">Meta-Clustering Dendrogram</div>
+                        <div class="card-body p-0">
+                            <div id="meta-dendrogram" style="height: 400px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Single/Medoid View -->
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-chart-area"></i> Visualization</span>
+                <span id="current-view-label" class="badge badge-info">Result</span>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-pills mb-3" id="vizTab" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="reach-tab" data-toggle="pill" href="#reachability"
+                            role="tab">Reachability Plot</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="dendro-tab" data-toggle="pill" href="#dendrogram"
+                            role="tab">Dendrogram</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="map-tab" data-toggle="pill" href="#map" role="tab">2D Projection</a>
+                    </li>
+                </ul>
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="reachability" role="tabpanel">
+                        <div id="reach-plot" style="height: 500px;"></div>
+                    </div>
+                    <div class="tab-pane fade" id="dendrogram" role="tabpanel">
+                        <div id="dendro-plot" style="height: 500px;"></div>
+                    </div>
+                    <div class="tab-pane fade" id="map" role="tabpanel">
+                        <div id="map-plot" style="height: 500px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
