@@ -8,93 +8,126 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/LOGO.png') }}">
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <!-- Bootstrap CSS for Grid/Modals (using CDN for simplicity in replication) -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 
 <body>
     <div id="wrapper">
-        <!-- Top Navbar -->
-        <nav class="navbar">
-            <div class="navbar-left">
-                <button type="button" class="btn-toggle-sidebar"><i class="fas fa-bars"></i></button>
-                <div class="navbar-brand">
-                    <a href="/"><img src="{{ url_for('static', filename='img/LOGO.png') }}" alt="MustaCHE"
-                            style="height: 45px; vertical-align: middle; margin-right: 10px;"> MustaCHE</a>
-                </div>
-            </div>
-            <div class="navbar-right">
-                <ul class="nav-icons">
-                    <li><a href="#" title="About" onclick="openAboutModal(); return false;"><i
-                                class="fas fa-info-circle"></i></a></li>
-                    <li><a href="#" title="Theme"><i class="fas fa-adjust"></i></a></li>
-                </ul>
-            </div>
-        </nav>
-
-        <!-- Sidebar -->
+        <!-- Fixed Sidebar -->
         <div class="sidebar">
-            <div class="sidebar-scroll">
-                <nav>
-                    <ul class="nav">
-                        <li><a href="/" class="{% if request.path == '/' %}active{% endif %}"><i
-                                    class="fas fa-home"></i> <span>Home</span></a></li>
-                        <li><a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}"><i
-                                    class="fas fa-chart-bar"></i> <span>Dashboard</span></a></li>
-                        <li><a href="/settings" class="{% if request.path == '/settings' %}active{% endif %}"><i
-                                    class="fas fa-cog"></i> <span>Settings</span></a></li>
-                    </ul>
-                </nav>
-
-                <div class="sidebar-footer">
-                    <p class="project-info">Project by:</p>
-                    <div class="logos">
-                        <img src="{{ url_for('static', filename='img/ufscar-logo.png') }}" alt="UFSCar">
-                        <img src="{{ url_for('static', filename='img/newcastle-logo.png') }}"
-                            alt="Newcastle University">
-                        <img src="{{ url_for('static', filename='img/jcu-logo.png') }}" alt="JCU">
-                    </div>
-                    <p class="copyright">&copy; 2017 The Develovers</p>
-                </div>
+            <div class="sidebar-header">
+                <img src="{{ url_for('static', filename='img/LOGO.png') }}" alt="MustaCHE Logo">
+                <h3>MustaCHE</h3>
             </div>
-        </div>
 
-        <!-- Main Content -->
-        <div class="main">
-            <div class="main-content">
-                {% block content %}{% endblock %}
-            </div>
-        </div>
-
-        <!-- About Modal -->
-        <div id="aboutModal" class="modal">
-            <div class="modal-content">
-                <span class="close" onclick="closeAboutModal()">&times;</span>
-                <h2>About MustaCHE v2</h2>
-                <p><strong>MustaCHE</strong> (Multiple Cluster Hierarchies Explorer) is a tool for analyzing
-                    hierarchical density-based clustering results.</p>
-
-                <h3>Version Information</h3>
-                <p>Version: 2.0 (Rebuilt)</p>
-                <p>Technology Stack: Flask + Python 3.11 + scikit-learn + Plotly.js</p>
-
-                <h3>Features</h3>
+            <div class="sidebar-nav">
+                <!-- Main Section -->
+                <div class="sidebar-section-title">Main</div>
                 <ul>
-                    <li>HDBSCAN density-based clustering</li>
-                    <li>Interactive visualizations (Reachability, Dendrogram, 2D Map)</li>
-                    <li>Ground truth validation metrics (ARI, AMI)</li>
-                    <li>Multiple distance metrics support</li>
+                    <!-- Trigger Configuration Modal -->
+                    <li><a href="#" onclick="openConfigModal(); return false;"><i class="fas fa-database"></i> Datasets
+                            / New</a></li>
+                    <li><a href="#" onclick="return false;"><i class="fas fa-cog"></i> Global Settings</a></li>
                 </ul>
 
-                <h3>Credits</h3>
-                <p>Original concept by: Antonio Cavalcante and others (2017)</p>
-                <p>Institutions: Federal University of São Carlos, Newcastle University, James Cook University</p>
-                <p>Rebuilt: Maylon Martins de Melo (2025)</p>
+                <!-- Panels Section -->
+                <div class="sidebar-section-title">Panels</div>
+                <ul>
+                    <li><a href="#dendrogram-panel"><i class="fas fa-sitemap"></i> Dendrogram</a></li>
+                    <li><a href="#hai-panel"><i class="fas fa-th"></i> HAI Plot</a></li>
+                    <li><a href="#reach-panel"><i class="fas fa-chart-area"></i> Reachability</a></li>
+                </ul>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="project-info">Project by:</div>
+                <div class="logos">
+                    <!-- Adjusted logos if available, using placeholders or text if paths differ. Assuming paths exist from previous base.html -->
+                    <img src="{{ url_for('static', filename='img/ufscar-logo.png') }}" alt="UFSCar" title="UFSCar">
+                    <img src="{{ url_for('static', filename='img/newcastle-logo.png') }}" alt="Newcastle"
+                        title="Newcastle University">
+                    <img src="{{ url_for('static', filename='img/jcu-logo.png') }}" alt="JCU"
+                        title="James Cook University">
+                </div>
+                <div class="copyright">&copy; 2017 The Develovers</div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="main">
+            <!-- Top Navbar (Minimal) -->
+            <div class="top-navbar">
+                <div class="breadcrumb-container">
+                    <!-- Breadcrumbs can go here -->
+                </div>
+                <div class="navbar-right">
+                    <a href="#" title="About" onclick="openAboutModal(); return false;"
+                        style="color: #95a5a6; font-size: 1.2rem;">
+                        <i class="fas fa-info-circle"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Scrollable Content -->
+            <div class="main-content-scroll">
+                {% block content %}{% endblock %}
             </div>
         </div>
     </div>
 
+    <!-- About Modal -->
+    <div id="aboutModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAboutModal()">&times;</span>
+            <h2>About MustaCHE v2</h2>
+            <p><strong>MustaCHE</strong> (Multiple Cluster Hierarchies Explorer) is a tool for analyzing hierarchical
+                density-based clustering results.</p>
+            <h3>Version Information</h3>
+            <p>Version: 2.0 (Rebuilt)</p>
+            <p>Technology Stack: Flask + Python 3.11 + scikit-learn + Plotly.js</p>
+            <h3>Credits</h3>
+            <p>Origin: Antonio Cavalcante et al. (2017)</p>
+            <p>Rebuilt: Maylon Martins de Melo (2025)</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <!-- jQuery and Bootstrap JS for Modals -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+    <script>
+        // Modal Logic
+        function openAboutModal() {
+            document.getElementById('aboutModal').style.display = "block";
+        }
+        function closeAboutModal() {
+            document.getElementById('aboutModal').style.display = "none";
+        }
+
+        // Config Modal will be defined in dashboard.html or main.js
+        function openConfigModal() {
+            if (document.getElementById('configModal')) {
+                $('#configModal').modal('show');
+            } else {
+                alert("Configuration is available on the Dashboard page.");
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function (event) {
+            var modal = document.getElementById('aboutModal');
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+    </script>
 </body>
 
 </html>

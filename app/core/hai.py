@@ -97,7 +97,10 @@ def run_meta_clustering(hai_matrix):
     
     # Generate Linkage Matrix for Dendrogram using scipy (Hybrid Approach)
     # This replaces the missing single_linkage_tree_ attribute in sklearn 1.3
-    condensed_dist = squareform(distance_matrix)
+    # Generate Linkage Matrix for Dendrogram using scipy (Hybrid Approach)
+    # This replaces the missing single_linkage_tree_ attribute in sklearn 1.3
+    condensed_dist = squareform(distance_matrix, checks=False)
+
     linkage_matrix = linkage(condensed_dist, method='single')
     
     return labels.tolist(), linkage_matrix.tolist()

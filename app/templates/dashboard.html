@@ -1,149 +1,189 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div class="container-fluid">
+    <!-- Toolbar / Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-dark font-weight-light">Analysis Dashboard</h2>
+        <button class="btn btn-primary" onclick="openConfigModal()">
+            <i class="fas fa-cogs"></i> New Analysis / Configuration
+        </button>
+    </div>
 
-<div class="row">
-    <!-- Analysis Controls -->
-    <div class="col-md-3">
-        <div class="card mb-3">
-            <div class="card-header bg-primary text-white">
-                <i class="fas fa-cogs"></i> Analysis Settings
+    <!-- Batch Analysis Panel (Hidden by default) -->
+    <div id="batch-results" class="d-none mb-5">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-project-diagram"></i> Global Analysis (HAI & Meta-Clusters)</span>
             </div>
             <div class="card-body">
-                <ul class="nav nav-tabs mb-3" id="modeTab" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link active" id="single-tab" data-toggle="tab" href="#single"
-                            role="tab">Single</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="batch-tab" data-toggle="tab" href="#batch" role="tab">Batch (HAI)</a>
-                    </li>
-                </ul>
-
-                <div class="tab-content" id="modeTabContent">
-                    <!-- Single Mode -->
-                    <div class="tab-pane fade show active" id="single" role="tabpanel">
-                        <form id="upload-form" enctype="multipart/form-data">
-                            <div class="form-group">
-                                <label>Dataset (CSV)</label>
-                                <input type="file" class="form-control-file" name="file" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Labels (Optional)</label>
-                                <input type="file" class="form-control-file" name="labels_file">
-                            </div>
-                            <hr>
-                            <div class="form-group">
-                                <label>Min Cluster Size</label>
-                                <input type="number" class="form-control" name="min_cluster_size" value="5" min="2">
-                            </div>
-                            <div class="form-group">
-                                <label>Metric</label>
-                                <select class="form-control" name="metric">
-                                    <option value="euclidean">Euclidean</option>
-                                    <option value="manhattan">Manhattan</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-success btn-block">Run HDBSCAN</button>
-                        </form>
+                <div class="row">
+                    <!-- HAI Heatmap -->
+                    <div class="col-lg-5">
+                        <h5 class="text-muted mb-3">HAI Similarity Matrix</h5>
+                        <div id="hai-heatmap" style="height: 450px; border: 1px solid #eee;"></div>
                     </div>
 
-                    <!-- Batch Mode -->
-                    <div class="tab-pane fade" id="batch" role="tabpanel">
-                        <form id="batch-form" enctype="multipart/form-data">
-                            <div class="form-group">
-                                <label>Dataset (CSV)</label>
-                                <input type="file" class="form-control-file" name="file" required>
-                            </div>
-                            <hr>
-                            <div class="form-group">
-                                <label>Range <code>mpts</code></label>
-                                <div class="d-flex">
-                                    <input type="number" class="form-control mr-1" name="min_mpts" placeholder="Min"
-                                        value="2" min="2">
-                                    <input type="number" class="form-control ml-1" name="max_mpts" placeholder="Max"
-                                        value="10">
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>Step</label>
-                                <input type="number" class="form-control" name="step" value="1" min="1">
-                            </div>
-                            <button type="submit" class="btn btn-warning btn-block">Run Batch & HAI</button>
-                        </form>
+                    <!-- Meta-Dendrogram -->
+                    <div class="col-lg-5">
+                        <h5 class="text-muted mb-3">Meta-Hierarchy Dendrogram</h5>
+                        <div id="meta-dendrogram" style="height: 450px; border: 1px solid #eee;"></div>
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Meta-Cluster Selection -->
-        <div id="meta-cluster-panel" class="card mb-3 d-none">
-            <div class="card-header bg-dark text-white">
-                <i class="fas fa-layer-group"></i> Meta-Clusters
-            </div>
-            <div class="card-body">
-                <p>Select a group to view representative hierarchy:</p>
-                <div id="meta-cluster-list" class="list-group">
-                    <!-- Populated by JS -->
+                    <!-- Meta-Clusters List -->
+                    <div class="col-lg-2">
+                        <div id="meta-cluster-panel" class="h-100">
+                            <h5 class="text-muted mb-3">Meta-Clusters</h5>
+                            <div class="alert alert-info py-2" style="font-size: 0.85rem;">
+                                Select a group to view representative:
+                            </div>
+                            <div id="meta-cluster-list" class="list-group sidebar-scroll"
+                                style="max-height: 400px; overflow-y: auto;">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Visualizations -->
-    <div class="col-md-9">
+    <!-- Single / Detail Analysis Panel -->
+    <div id="single-view-panel">
+        <!-- Dendrogram (Top Full Width) -->
+        <div class="card mb-4" id="dendrogram-panel">
+            <div class="card-header">
+                <i class="fas fa-sitemap"></i> Hierarchy Dendrogram
+                <span id="current-view-label" class="badge badge-secondary ml-2">No Result</span>
+            </div>
+            <div class="card-body p-0">
+                <div id="dendro-plot" style="height: 400px; width: 100%;"></div>
+            </div>
+        </div>
 
-        <!-- Batch Views -->
-        <div id="batch-results" class="d-none">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="card mb-3">
-                        <div class="card-header">HAI Matrix (Similarity)</div>
-                        <div class="card-body p-0">
-                            <div id="hai-heatmap" style="height: 400px;"></div>
-                        </div>
+        <!-- split Bottom: Reachability | 2D Map -->
+        <div class="row">
+            <div class="col-lg-6" id="reach-panel">
+                <div class="card mb-4">
+                    <div class="card-header"><i class="fas fa-chart-area"></i> Reachability Plot</div>
+                    <div class="card-body p-0">
+                        <div id="reach-plot" style="height: 400px; width: 100%;"></div>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="card mb-3">
-                        <div class="card-header">Meta-Clustering Dendrogram</div>
-                        <div class="card-body p-0">
-                            <div id="meta-dendrogram" style="height: 400px;"></div>
-                        </div>
+            </div>
+            <div class="col-lg-6" id="map-panel">
+                <div class="card mb-4">
+                    <div class="card-header"><i class="fas fa-map"></i> 2D Projection (t-SNE/UMAP)</div>
+                    <div class="card-body p-0">
+                        <div id="map-plot" style="height: 400px; width: 100%;"></div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
-        <!-- Single/Medoid View -->
-        <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-chart-area"></i> Visualization</span>
-                <span id="current-view-label" class="badge badge-info">Result</span>
+<!-- Configuration Modal -->
+<div class="modal fade modal-config" id="configModal" tabindex="-1" role="dialog" aria-labelledby="configModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="configModalLabel">Analysis Configuration</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
-            <div class="card-body">
-                <ul class="nav nav-pills mb-3" id="vizTab" role="tablist">
+            <div class="modal-body">
+                <ul class="nav nav-tabs mb-4" id="configTab" role="tablist">
                     <li class="nav-item">
-                        <a class="nav-link active" id="reach-tab" data-toggle="pill" href="#reachability"
-                            role="tab">Reachability Plot</a>
+                        <a class="nav-link active" id="single-conf-tab" data-toggle="tab" href="#single-conf"
+                            role="tab">Single Analysis</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" id="dendro-tab" data-toggle="pill" href="#dendrogram"
-                            role="tab">Dendrogram</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="map-tab" data-toggle="pill" href="#map" role="tab">2D Projection</a>
+                        <a class="nav-link" id="batch-conf-tab" data-toggle="tab" href="#batch-conf" role="tab">Batch
+                            Analysis (HAI)</a>
                     </li>
                 </ul>
-                <div class="tab-content">
-                    <div class="tab-pane fade show active" id="reachability" role="tabpanel">
-                        <div id="reach-plot" style="height: 500px;"></div>
+
+                <div class="tab-content" id="configTabContent">
+                    <!-- Single Mode Form -->
+                    <div class="tab-pane fade show active" id="single-conf" role="tabpanel">
+                        <form id="upload-form" enctype="multipart/form-data">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Dataset (CSV) <span class="required">*</span></label>
+                                        <input type="file" class="form-control-file" name="file" required>
+                                        <small>Features only, no headers preferred.</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Labels (Optional)</label>
+                                        <input type="file" class="form-control-file" name="labels_file">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Min Cluster Size</label>
+                                        <input type="number" class="form-control" name="min_cluster_size" value="5"
+                                            min="2">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Distance Metric</label>
+                                        <select class="form-control" name="metric">
+                                            <option value="euclidean">Euclidean</option>
+                                            <option value="manhattan">Manhattan</option>
+                                            <option value="chebyshev">Chebyshev</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right mt-3">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-play"></i> Run Single
+                                    Analysis</button>
+                            </div>
+                        </form>
                     </div>
-                    <div class="tab-pane fade" id="dendrogram" role="tabpanel">
-                        <div id="dendro-plot" style="height: 500px;"></div>
-                    </div>
-                    <div class="tab-pane fade" id="map" role="tabpanel">
-                        <div id="map-plot" style="height: 500px;"></div>
+
+                    <!-- Batch Mode Form -->
+                    <div class="tab-pane fade" id="batch-conf" role="tabpanel">
+                        <form id="batch-form" enctype="multipart/form-data">
+                            <div class="alert alert-light border">
+                                <i class="fas fa-info-circle"></i> Batch mode runs HDBSCAN multiple times with varying
+                                parameters to find stable meta-clusters.
+                            </div>
+                            <div class="form-group">
+                                <label>Dataset (CSV) <span class="required">*</span></label>
+                                <input type="file" class="form-control-file" name="file" required>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label>Min <code>mpts</code></label>
+                                        <input type="number" class="form-control" name="min_mpts" value="2" min="2">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label>Max <code>mpts</code></label>
+                                        <input type="number" class="form-control" name="max_mpts" value="10" min="2">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label>Step Size</label>
+                                        <input type="number" class="form-control" name="step" value="1" min="1">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right mt-3">
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary"><i class="fas fa-layer-group"></i> Run
+                                    Batch & HAI Analysis</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>

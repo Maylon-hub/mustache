@@ -4,6 +4,7 @@ from .core import run_clustering
 from .core.batch import run_batch_clustering
 
 import io
+import numpy as np
 
 main = Blueprint('main', __name__)
 
@@ -29,8 +30,20 @@ def upload_file():
         return jsonify({'error': 'No selected file'}), 400
         
     try:
-        # Read CSV (assume no header for numerical data)
-        df = pd.read_csv(file, header=None)
+        # Read CSV with header inference
+        df = pd.read_csv(file)
+        
+        # Ensure we only have numeric data for clustering
+        df_numeric = df.select_dtypes(include=[np.number])
+        if df_numeric.empty:
+            # If inference with header failed or file has no header but read_csv took first row as header
+            # Try once more without header if the inferred one has no numeric columns
+            file.seek(0)
+            df = pd.read_csv(file, header=None)
+            df_numeric = df.select_dtypes(include=[np.number])
+            
+        if df_numeric.empty:
+            return jsonify({'error': 'The provided file contains no numerical data for clustering.'}), 400
         
         # Read Labels if provided
         true_labels = None
@@ -67,8 +80,15 @@ def batch_process():
         return jsonify({'error': 'No selected file'}), 400
         
     try:
-        # Read CSV
-        df = pd.read_csv(file, header=None)
+        # Read CSV with header inference
+        df = pd.read_csv(file)
+        
+        # Validate numeric data
+        if df.select_dtypes(include=[np.number]).empty:
+            file.seek(0)
+            df = pd.read_csv(file, header=None)
+            if df.select_dtypes(include=[np.number]).empty:
+                return jsonify({'error': 'The provided file contains no numerical data for clustering.'}), 400
         
         # Get parameters for batch
         min_mpts = int(request.form.get('min_mpts', 2))

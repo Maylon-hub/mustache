@@ -4,14 +4,63 @@ from sklearn.cluster import HDBSCAN
 import pandas as pd
 import numpy as np
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
+from sklearn.neighbors import NearestNeighbors
+from scipy.spatial.distance import pdist, squareform
+
+
+def compute_mutual_reachability(data, min_samples, metric='euclidean'):
+    """
+    Computes the Mutual Reachability Distance matrix for HDBSCAN.
+    d_mreach(a, b) = max(core_k(a), core_k(b), d(a, b))
+    """
+    n_samples = data.shape[0]
+    k = min(min_samples, n_samples)
+    
+    # Compute Core Distances (distance to k-th nearest neighbor)
+    nbrs = NearestNeighbors(n_neighbors=k, metric=metric).fit(data)
+    core_distances, _ = nbrs.kneighbors(data)
+    core_dist = core_distances[:, -1]
+    
+    # Compute basic Distance Matrix
+    if metric == 'euclidean':
+        raw_dist = squareform(pdist(data))
+    else:
+        raw_dist = squareform(pdist(data, metric=metric))
+        
+    # Vectorized Mutual Reachability
+    # MR[i,j] = max(core[i], core[j], dist[i,j])
+    
+    # Expand core distances to matrix for broadcasting
+    # core_mat[i, j] = core_dist[i]
+    core_mat = np.tile(core_dist, (n_samples, 1))
+    
+    # Symmetric max of cores: max(core[i], core[j])
+    # max_core[i, j] = max(core[i], core[j])
+    max_core = np.maximum(core_mat, core_mat.T)
+    
+    # Final MR
+    mreach_mat = np.maximum(max_core, raw_dist)
+    
+    # Ensure diagonal is exactly zero (fix for floating point errors)
+    np.fill_diagonal(mreach_mat, 0)
+    
+    return mreach_mat
+
+
+
+
 
 def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean', true_labels=None):
+
     """
     Runs HDBSCAN clustering on the provided DataFrame using scikit-learn.
     Returns a dictionary with results.
     """
     # Convert DataFrame to numpy array
     data = df.select_dtypes(include=[np.number]).to_numpy()
+    
+    if data.size == 0 or data.shape[1] == 0:
+        raise ValueError("No numerical data found for clustering. Please ensure the CSV contains numeric columns.")
     
     clusterer = HDBSCAN(
         min_cluster_size=int(min_cluster_size),
@@ -30,7 +79,19 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
     import plotly.figure_factory as ff
     
     # Use 'single' linkage to mimic HDBSCAN's MST-based approach
-    Z = linkage(data, method='single', metric=metric)
+    # FIX: Use Mutual Reachability Distance instead of Euclidean Distance
+    # This ensures the hierarchy varies with min_samples (mpts)
+    
+    # MR Distance Matrix
+    m_samples_val = int(min_samples) if min_samples else int(min_cluster_size)
+    mreach_matrix = compute_mutual_reachability(data, m_samples_val, metric)
+    
+    # Condense for linkage (scipy expects condensed distance array)
+    condensed_mreach = squareform(mreach_matrix, checks=False)
+
+    
+    Z = linkage(condensed_mreach, method='single')
+
 
     
     # Create Dendrogram Figure
