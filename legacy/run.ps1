@@ -1,3 +1,4 @@
+powershell -ExecutionPolicy Bypass -File .\run.ps1
 $ErrorActionPreference = "Stop"
 
 # Configuração de variáveis de ambiente

@@ -38,6 +38,13 @@
    .\run.ps1
    ```
    
+  or (in case of permission errors):
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\run.ps1
+   ```
+  
+   
    **Linux/Mac**:
    ```bash
    chmod +x run.sh

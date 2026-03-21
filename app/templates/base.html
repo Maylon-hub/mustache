@@ -18,56 +18,81 @@
     <div id="wrapper">
         <!-- Fixed Sidebar -->
         <div class="sidebar">
-            <div class="sidebar-header">
-                <img src="{{ url_for('static', filename='img/LOGO.png') }}" alt="MustaCHE Logo">
-                <h3>MustaCHE</h3>
+            <div class="sidebar-header"
+                style="background:var(--sidebar-bg); border-bottom: none; display: flex; align-items: center; gap: 10px;">
+                <img src="{{ url_for('static', filename='img/Mustache_Logo_SVG.svg') }}" alt="MustaCHE Logo"
+                    style="height: 30px; filter: brightness(0) invert(1);">
+                <h3 style="color:#fff; margin: 0;"><span style="color:var(--primary-green);">Musta</span>CHE</h3>
             </div>
 
             <div class="sidebar-nav">
                 <!-- Main Section -->
                 <div class="sidebar-section-title">Main</div>
                 <ul>
-                    <!-- Trigger Configuration Modal -->
-                    <li><a href="#" onclick="openConfigModal(); return false;"><i class="fas fa-database"></i> Datasets
-                            / New</a></li>
+                    <li><a href="#" onclick="openBatchConfigModal(); return false;"><i class="fas fa-chart-pie"></i>
+                            Datasets</a></li>
                     <li><a href="#" onclick="return false;"><i class="fas fa-cog"></i> Global Settings</a></li>
                 </ul>
 
                 <!-- Panels Section -->
                 <div class="sidebar-section-title">Panels</div>
                 <ul>
-                    <li><a href="#dendrogram-panel"><i class="fas fa-sitemap"></i> Dendrogram</a></li>
-                    <li><a href="#hai-panel"><i class="fas fa-th"></i> HAI Plot</a></li>
-                    <li><a href="#reach-panel"><i class="fas fa-chart-area"></i> Reachability</a></li>
+                    <li><a href="#"><i class="fas fa-sitemap"></i> Dendrogram</a></li>
+                    <li><a href="#"><i class="fas fa-th"></i> HAI Plot</a></li>
+                    <li><a href="#"><i class="fas fa-chart-area"></i> Reachability</a></li>
                 </ul>
             </div>
 
-            <div class="sidebar-footer">
-                <div class="project-info">Project by:</div>
-                <div class="logos">
-                    <!-- Adjusted logos if available, using placeholders or text if paths differ. Assuming paths exist from previous base.html -->
-                    <img src="{{ url_for('static', filename='img/ufscar-logo.png') }}" alt="UFSCar" title="UFSCar">
+            <div class="project-info-panel">
+                <div class="sidebar-section-title" style="padding:0; margin-bottom:10px;">Project</div>
+                <div class="label">Name:</div>
+                <div class="value" id="proj-name">Unknown</div>
+                <div class="label">Min mpts:</div>
+                <div class="value" id="proj-min-mpts">-</div>
+            </div>
+
+            <div class="sidebar-footer" style="padding-bottom: 10px;">
+                <div class="project-info" style="font-size:0.75rem; margin-bottom:5px;">Project by:</div>
+                <div class="logos"
+                    style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; align-items:center; padding: 0 5px;">
+                    <img src="{{ url_for('static', filename='img/ufscar-logo.png') }}" alt="UFSCar" title="UFSCar"
+                        style="max-width: 100%; max-height: 25px; object-fit: contain;">
                     <img src="{{ url_for('static', filename='img/newcastle-logo.png') }}" alt="Newcastle"
-                        title="Newcastle University">
+                        title="Newcastle University" style="max-width: 100%; max-height: 25px; object-fit: contain;">
+                    <img src="{{ url_for('static', filename='img/UA-EAC-COLOUR-REVERSE.svg') }}"
+                        alt="University of Alberta" title="University of Alberta"
+                        style="max-width: 100%; max-height: 25px; object-fit: contain;">
                     <img src="{{ url_for('static', filename='img/jcu-logo.png') }}" alt="JCU"
-                        title="James Cook University">
+                        title="James Cook University" style="max-width: 100%; max-height: 25px; object-fit: contain;">
                 </div>
-                <div class="copyright">&copy; 2017 The Develovers</div>
+                <div class="copyright" style="font-size:0.7rem; margin-top:5px; text-align:center;">&copy; 2017 The
+                    Develovers</div>
             </div>
         </div>
 
         <!-- Main Content Area -->
         <div class="main">
-            <!-- Top Navbar (Minimal) -->
-            <div class="top-navbar">
-                <div class="breadcrumb-container">
-                    <!-- Breadcrumbs can go here -->
+            <!-- Top Navbar matches overview.png -->
+            <div class="top-navbar"
+                style="justify-content: space-between; background: #fff; border-bottom: 2px solid #2ecc71;">
+                <div class="brand d-flex align-items-center">
+                    <!-- Nav Logo -->
+                    <i class="fas fa-bars"
+                        style="font-size: 1.2rem; color: #95a5a6; margin-right: 15px; cursor: pointer;"></i>
+                    <img src="{{ url_for('static', filename='img/LOGO.png') }}" alt="MustaCHE Logo"
+                        style="height: 35px;">
                 </div>
-                <div class="navbar-right">
+                <div class="navbar-right d-flex align-items-center">
+                    <div class="input-group input-group-sm" style="width: 250px; margin-right: 15px;">
+                        <input type="text" class="form-control" placeholder="Search datasets...">
+                        <div class="input-group-append">
+                            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                        </div>
+                    </div>
+                    <a href="#" title="Settings" style="color: #95a5a6; font-size: 1.2rem; margin-right: 15px;"><i
+                            class="fas fa-cog"></i></a>
                     <a href="#" title="About" onclick="openAboutModal(); return false;"
-                        style="color: #95a5a6; font-size: 1.2rem;">
-                        <i class="fas fa-info-circle"></i>
-                    </a>
+                        style="color: #95a5a6; font-size: 1.2rem;"><i class="fas fa-info-circle"></i></a>
                 </div>
             </div>
 

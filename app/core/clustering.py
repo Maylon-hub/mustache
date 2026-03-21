@@ -186,11 +186,14 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
     from sklearn.manifold import TSNE
     
     # Use t-SNE to project data to 2D
-    # Perplexity should be less than number of samples. Default is 30.
+    # Perplexity should be considerably less than number of samples to prevent hanging on small data.
     n_samples = data.shape[0]
-    perplexity = min(30, n_samples - 1) if n_samples > 1 else 1
+    perplexity = min(30, max(1, n_samples // 3))
     
-    tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42)
+    # Use exact method for tiny datasets to prevent barnes_hut bugs
+    method = 'exact' if n_samples < 50 else 'barnes_hut'
+    
+    tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42, method=method, init='pca')
     projection = tsne.fit_transform(data)
 
     

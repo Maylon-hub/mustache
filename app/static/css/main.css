@@ -1,13 +1,13 @@
 :root {
-    /* Legacy Palette */
-    --primary-green: #2ecc71;  /* Vibrant Green */
+    /* Legacy Palette - based on original screenshot */
+    --primary-green: #2ecc71;
     --primary-green-dark: #27ae60;
-    --sidebar-bg: #2c3e50;     /* Dark Slate Blue */
+    --sidebar-bg: #2c3e50;
     --sidebar-text: #ecf0f1;
-    --header-bg: #ffffff;
-    --body-bg: #ecf0f1;
-    --text-color: #2c3e50;
-    --border-color: #ddd;
+    --header-bg: #f8f9fa;
+    --body-bg: #e2e4e6;
+    --text-color: #333333;
+    --border-color: #d1d5da;
 }
 
 body {
@@ -17,37 +17,39 @@ body {
     margin: 0;
     padding: 0;
     height: 100vh;
-    overflow: hidden; /* Prevent body scroll, use inner scroll */
+    overflow: hidden;
 }
 
-/* Wrapper for Fixed Sidebar Layout */
 #wrapper {
     display: flex;
     height: 100vh;
     width: 100%;
 }
 
-/* Fixed Sidebar */
 .sidebar {
-    width: 250px;
+    width: 200px;
+    /* Reduced width */
     background-color: var(--sidebar-bg);
     color: var(--sidebar-text);
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
     height: 100%;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    z-index: 100;
 }
 
 .sidebar-header {
-    padding: 20px;
-    background-color: rgba(0,0,0,0.1);
+    padding: 15px 20px;
+    background-color: #fff;
+    color: var(--primary-green-dark);
     display: flex;
     align-items: center;
+    border-bottom: 1px solid #ddd;
 }
 
 .sidebar-header img {
-    height: 40px;
+    height: 25px;
     margin-right: 10px;
 }
 
@@ -55,140 +57,152 @@ body {
     margin: 0;
     font-size: 1.2rem;
     font-weight: 700;
-    color: var(--sidebar-text);
 }
 
 .sidebar-nav {
     flex-grow: 1;
     overflow-y: auto;
-    padding-top: 20px;
+    padding-top: 10px;
 }
 
 .sidebar-section-title {
     padding: 10px 20px;
-    font-size: 0.8rem;
-    text-transform: uppercase;
+    font-size: 0.85rem;
+    text-transform: capitalize;
     color: #95a5a6;
-    margin-top: 10px;
 }
 
 .sidebar-nav ul {
     list-style: none;
     padding: 0;
-    margin: 0;
+    margin: 0 0 20px 0;
 }
 
 .sidebar-nav li a {
     display: flex;
     align-items: center;
-    padding: 12px 20px;
+    padding: 8px 15px;
     color: var(--sidebar-text);
     text-decoration: none;
-    transition: background 0.2s, color 0.2s;
-    border-left: 4px solid transparent;
+    font-size: 0.85rem;
+    border-left: 3px solid transparent;
 }
 
-.sidebar-nav li a:hover, .sidebar-nav li a.active {
-    background-color: rgba(255,255,255,0.05);
+.sidebar-nav li a:hover,
+.sidebar-nav li a.active {
+    background-color: rgba(255, 255, 255, 0.05);
     border-left-color: var(--primary-green);
-    color: white;
+    color: #fff;
 }
 
 .sidebar-nav li a i {
     width: 25px;
     text-align: center;
-    margin-right: 10px;
+    margin-right: 15px;
+    font-size: 1.1rem;
 }
 
-/* Footer in Sidebar */
-.sidebar-footer {
-    padding: 20px;
-    font-size: 0.75rem;
+.project-info-panel {
+    padding: 15px 20px;
+    font-size: 0.85rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.project-info-panel .label {
     color: #95a5a6;
-    background-color: rgba(0,0,0,0.2);
+    font-weight: bold;
 }
 
-.sidebar-footer .logos {
-    display: flex;
-    gap: 5px;
-    margin-top: 10px;
-    flex-wrap: wrap;
+.project-info-panel .value {
+    color: #fff;
+    margin-bottom: 5px;
+}
+
+.sidebar-footer {
+    padding: 15px;
+    background-color: rgba(0, 0, 0, 0.2);
 }
 
 .sidebar-footer .logos img {
-    height: 20px;
-    opacity: 0.7;
+    max-width: 80%;
+    max-height: 40px;
+    margin-bottom: 5px;
+    opacity: 0.8;
 }
 
-/* Main Content Area */
 .main {
     flex-grow: 1;
     display: flex;
     flex-direction: column;
     height: 100%;
     overflow: hidden;
-    position: relative;
 }
 
 .top-navbar {
     background-color: var(--header-bg);
-    height: 60px;
+    height: 65px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     padding: 0 20px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    z-index: 10;
+    border-bottom: 1px solid #ddd;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .main-content-scroll {
     flex-grow: 1;
-    padding: 20px;
+    padding: 15px;
     overflow-y: auto;
 }
 
-/* Overwrite Bootstrap classes where needed */
-.btn-primary, .btn-success {
-    background-color: var(--primary-green) !important;
-    border-color: var(--primary-green) !important;
+/* MustaCHE Layout Grid */
+.mustache-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 15px;
 }
 
-.btn-primary:hover, .btn-success:hover {
-    background-color: var(--primary-green-dark) !important;
+.pane {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    border-radius: 2px;
 }
 
-.card {
-    border: none;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    margin-bottom: 20px;
-    border-radius: 4px;
+.pane-top {
+    flex: 0 0 450px;
+}
+
+.pane-bottom-container {
+    display: flex;
+    flex: 1;
+    gap: 15px;
+    min-height: 450px;
+}
+
+.pane-bottom-left {
+    flex: 0 0 35%;
+    /* roughly 1/3 for HAI */
+}
+
+.pane-bottom-right {
+    flex: 1;
+    /* roughly 2/3 for Reachability */
+    overflow: hidden;
 }
 
 .card-header {
-    background-color: #fff;
+    background-color: #fcfcfc;
     border-bottom: 1px solid #eee;
     font-weight: 500;
+    padding: 10px 15px;
 }
 
-/* Modal Styles for Configuration */
-.modal-config .modal-content {
-    border: none;
-    border-radius: 0;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-}
-
-.modal-config .modal-header {
-    background-color: #fff;
-    border-bottom: 2px solid var(--primary-green);
-    color: var(--text-color);
-}
-
-.modal-config .modal-header h5 {
-    color: var(--primary-green);
-    font-weight: 700;
-}
-
-.form-control:focus {
-    border-color: var(--primary-green);
-    box-shadow: 0 0 0 0.2rem rgba(46, 204, 113, 0.25);
+/* Reachability multiple plot styling */
+.reachability-plot-wrapper {
+    flex: 0 0 300px;
+    min-width: 300px;
+    height: 100%;
+    border-right: 1px dashed #ddd;
 }

@@ -123,6 +123,7 @@ def analyze_batch_results(batch_results):
     return {
         'hai_matrix': hai_matrix.tolist(),
         'meta_labels': meta_labels,
+        'meta_linkage': meta_linkage.tolist() if isinstance(meta_linkage, np.ndarray) else meta_linkage,
         'meta_dendrogram_json': meta_dendro_json,
         'medoids': medoids_mpts,
         'ordered_mpts': [int(k) for k in sorted_keys]

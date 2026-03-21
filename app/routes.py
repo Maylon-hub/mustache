@@ -2,11 +2,20 @@ from flask import Blueprint, render_template, request, jsonify
 import pandas as pd
 from .core import run_clustering
 from .core.batch import run_batch_clustering
+from scipy.cluster.hierarchy import fcluster
 
 import io
 import numpy as np
 
 main = Blueprint('main', __name__)
+
+# Global state to store the latest batch session for dynamic dendrogram cuts
+# Acceptable for single-user local tool usage.
+SESSION_DATA = {
+    'meta_linkage': None,
+    'hai_matrix': None,
+    'ordered_mpts': None
+}
 
 @main.route('/')
 def index():
@@ -103,6 +112,15 @@ def batch_process():
         from .core.batch import analyze_batch_results
         analysis = analyze_batch_results(results)
         
+        # Store for dynamic cuts
+        SESSION_DATA['meta_linkage'] = analysis.get('meta_linkage')
+        SESSION_DATA['hai_matrix'] = analysis.get('hai_matrix')
+        SESSION_DATA['ordered_mpts'] = analysis.get('ordered_mpts')
+        
+        # Remove meta_linkage from JSON response since we don't need to send the large matrix
+        if 'meta_linkage' in analysis:
+            del analysis['meta_linkage']
+        
         return jsonify({
             'message': 'Batch clustering successful',
             'range': {'min': min_mpts, 'max': max_mpts, 'step': step},
@@ -112,5 +130,42 @@ def batch_process():
 
         
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@main.route('/cut_dendrogram', methods=['POST'])
+def cut_dendrogram():
+    try:
+        data = request.get_json()
+        y_threshold = float(data.get('y_threshold', 0.0))
+        
+        Z = SESSION_DATA.get('meta_linkage')
+        hai_matrix = SESSION_DATA.get('hai_matrix')
+        ordered_mpts = SESSION_DATA.get('ordered_mpts')
+
+        if Z is None or hai_matrix is None:
+            return jsonify({'error': 'No active batch session found.'}), 400
+        
+        # We need to compute cluster labels using fcluster
+        # distance criterion cuts the tree at y_threshold
+        labels = fcluster(Z, t=y_threshold, criterion='distance')
+        
+        # Scipy clustering returns 1-indexed labels (1, 2, 3...)
+        # We need to map them back to medoids.
+        from .core.hai import compute_medoids
+        
+        medoids_map = compute_medoids(np.array(hai_matrix), labels)
+        
+        medoids_mpts = {}
+        for label, idx in medoids_map.items():
+            if idx < len(ordered_mpts):
+                medoids_mpts[int(label)] = int(ordered_mpts[idx])
+            
+        return jsonify({
+            'meta_labels': labels.tolist(),
+            'medoids': medoids_mpts
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 

@@ -1,89 +1,86 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="card">
-    <h2>New Analysis</h2>
-    <form id="uploadForm">
-        <!-- Data Files Section -->
-        <div class="param-section">
-            <h3>Data Files</h3>
-            <div class="form-group">
-                <label for="file">Dataset (CSV) <span class="required">*</span></label>
-                <input type="file" id="file" name="file" accept=".csv" required>
-                <small>Upload your dataset as a CSV file with numerical features</small>
-            </div>
+<div class="mustache-layout">
+    <!-- Top Pane: Dendrogram (Meta-Clusters) -->
+    <div class="pane pane-top card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Dendrogram</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="openBatchConfigModal()"><i class="fas fa-layer-group"></i> Run Batch</button>
+        </div>
+        <div class="card-body p-0">
+            <div id="meta-dendrogram" style="height: 400px; width: 100%;"></div>
+        </div>
+    </div>
 
-            <div class="form-group">
-                <label for="labels_file">Ground Truth Labels (Optional CSV)</label>
-                <input type="file" id="labels_file" name="labels_file" accept=".csv">
-                <small>Optional: Upload known labels for validation metrics</small>
+    <!-- Bottom Panes -->
+    <div class="pane-bottom-container">
+        <!-- Bottom Left: HAI Matrix -->
+        <div class="pane pane-bottom-left card">
+            <div class="card-header">HAI Plot</div>
+            <div class="card-body p-0">
+                <div id="hai-heatmap" style="height: 400px; width: 100%;"></div>
             </div>
         </div>
 
-        <!-- Clustering Parameters Section -->
-        <div class="param-section">
-            <h3>Clustering Parameters</h3>
-            <div class="param-row">
-                <div class="param-col">
-                    <label>Min Cluster Size <span class="required">*</span></label>
-                    <input type="number" name="min_cluster_size" value="5" min="2" required>
-                    <small>Minimum number of points to form a cluster</small>
-                </div>
-                <div class="param-col">
-                    <label>Min Samples</label>
-                    <input type="number" name="min_samples" value="5" min="1">
-                    <small>Core point neighborhood size (optional)</small>
-                </div>
-            </div>
-            <div class="param-row" style="margin-top: 15px;">
-                <div class="param-col">
-                    <label>Distance Metric</label>
-                    <select name="metric">
-                        <option value="euclidean" selected>Euclidean (L2)</option>
-                        <option value="manhattan">Manhattan (L1)</option>
-                    </select>
-                    <small>Distance function for density calculation</small>
+        <!-- Bottom Right: Reachability Plots -->
+        <div class="pane pane-bottom-right card">
+            <div class="card-header">Reachability Plots</div>
+            <div class="card-body p-0">
+                <!-- We will append multiple reachability plots here side-by-side -->
+                <div id="reachability-container" class="d-flex" style="overflow-x: auto; height: 400px;">
+                    <!-- JS will populate individual reachability plots -->
+                    <div class="text-muted p-3">Run Batch Analysis to generate meta-clusters.</div>
                 </div>
             </div>
         </div>
-
-        <button type="submit" class="btn btn-primary">
-            <i class="fas fa-play"></i> Run Clustering
-        </button>
-    </form>
+    </div>
 </div>
 
-<div id="results" class="card hidden">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2 style="margin: 0;">Results</h2>
-        <button type="button" class="btn btn-secondary" onclick="exportResults()">
-            <i class="fas fa-download"></i> Export JSON
-        </button>
+<!-- Configuration Modal for Batch -->
+<div class="modal fade" id="batchConfigModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Configure Multiple Clustering Hierarchies Explorer</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="batch-form" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label>Dataset (CSV) <span class="required">*</span></label>
+                        <input type="file" class="form-control-file" name="file" required>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Min <code>mpts</code></label>
+                                <input type="number" class="form-control" name="min_mpts" value="2" min="2">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Max <code>mpts</code></label>
+                                <input type="number" class="form-control" name="max_mpts" value="50" min="2">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Step Size</label>
+                                <input type="number" class="form-control" name="step" value="2" min="1">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right mt-3">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success"><i class="fas fa-play"></i> Run Explore</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-
-    <div id="metrics" class="metrics-container"
-        style="margin-bottom: 20px; padding: 15px; background: #e8f5e9; border-radius: 5px; display: none;">
-        <h3>Validation Metrics</h3>
-        <p><strong>ARI:</strong> <span id="ari-score">-</span></p>
-        <p><strong>AMI:</strong> <span id="ami-score">-</span></p>
-    </div>
-
-    <div class="chart-container">
-        <h3>Reachability Plot</h3>
-        <div id="reachability" style="width:100%; height:400px;"></div>
-    </div>
-
-    <div class="chart-container">
-        <h3>2D Projection (Map)</h3>
-        <div id="map" style="width:100%; height:500px;"></div>
-    </div>
-
-    <div class="chart-container">
-        <h3>Hierarchical Dendrogram</h3>
-        <div id="dendrogram" style="width:100%; height:500px;"></div>
-    </div>
-
-    <h3>Raw Output</h3>
-    <pre id="output"></pre>
 </div>
 {% endblock %}
