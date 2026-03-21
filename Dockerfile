@@ -1,5 +1,10 @@
+<<<<<<< Updated upstream
 # Stage 1: Builder
 FROM python:3.11-slim as builder
+=======
+FROM ubuntu:20.04
+USER root
+>>>>>>> Stashed changes
 
 WORKDIR /app
 
