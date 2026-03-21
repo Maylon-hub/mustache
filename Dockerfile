@@ -1,10 +1,5 @@
-<<<<<<< Updated upstream
 # Stage 1: Builder
 FROM python:3.11-slim as builder
-=======
-FROM ubuntu:20.04
-USER root
->>>>>>> Stashed changes
 
 WORKDIR /app
 
@@ -44,6 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV PYTHONPATH=/install:/app
 ENV FLASK_APP=run.py
 ENV PYTHONUNBUFFERED=1
+ENV PATH="/install/bin:$PATH"
 
 # Copy installed packages from builder
 COPY --from=builder /install /install

@@ -1,0 +1,113 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{geometry}
+\usepackage{float} % Para posicionamento preciso de figuras
+\geometry{a4paper, left=3cm, right=2cm, top=3cm, bottom=2cm}
+
+\title{Relatório Parcial de Iniciação Científica (PIBIC-Af)\\
+\large Desenvolvimento e Melhoria do MustaCHE através do CORE-SG}
+\author{Maylon Martins de Melo\\
+Orientador: Prof. Dr. Murilo Naldi\\
+2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Este relatório parcial descreve as atividades desenvolvidas nos primeiros seis meses do projeto. O foco principal deste período foi a reengenharia completa da ferramenta MustaCHE, visando superar problemas de obsolescência tecnológica da versão original (Python 2 e Java) e estabelecer uma plataforma moderna e sustentável (Python 3, Flask, Docker) para a futura integração e validação do algoritmo CORE-SG.
+\end{abstract}
+
+\section{Introdução e Justificativa}
+
+O objetivo central deste projeto de Iniciação Científica é aprimorar a eficiência computacional da ferramenta MustaCHE (\textit{Multiple Cluster Hierarchies Explorer}) através da integração do algoritmo CORE-SG.
+
+No entanto, durante a etapa inicial de análise da ferramenta preexistente, identificou-se um desafio crítico: a versão original do software, desenvolvida em 2017, encontrava-se em estado de obsolescência técnica. Baseada em Python 2.7 e dependente de componentes legados em Java e bibliotecas gráficas descontinuadas, a ferramenta apresentava barreiras severas de execução em sistemas operacionais modernos, comprometendo a reprodutibilidade dos experimentos.
+
+Diante desse cenário, a estratégia de pesquisa para este primeiro período foi ajustada para priorizar a \textbf{Reengenharia de Software} da plataforma. Entendeu-se que a implementação de novos algoritmos de otimização (como o CORE-SG) sobre uma base instável e de difícil execução seria cientificamente improdutiva.
+
+Portanto, os esforços concentraram-se na reconstrução completa da arquitetura do MustaCHE, estabelecendo uma versão funcional moderna (\textit{MustaCHE v2}) que servirá como alicerce robusto para as comparações de desempenho previstas na próxima etapa.
+
+\section{Metodologia}
+
+A metodologia adotada consistiu na migração tecnológica e refatoração completa do código-fonte, seguindo as melhores práticas de Engenharia de Software e Ciência de Dados. As principais etapas realizadas foram:
+
+\begin{enumerate}
+    \item \textbf{Atualização da Stack Tecnológica}: Substituição integral do \textit{backend} legado. A dependência de Java foi removida, e todo o sistema foi reescrito em \textbf{Python 3.11}, utilizando o framework web \textbf{Flask} para gerenciamento das requisições.
+    \item \textbf{Containerização e Reprodutibilidade}: Implementação de um ambiente virtualizado com \textbf{Docker} e Docker Compose. Isso eliminou os problemas de compatibilidade entre diferentes sistemas operacionais (Windows/Linux/macOS), permitindo que a ferramenta seja instalada e executada com um único comando.
+    \item \textbf{Modernização Algorítmica}: Substituição de implementações \textit{ad-hoc} de clustering por bibliotecas científicas consolidadas e otimizadas. Utilizou-se a biblioteca \textbf{scikit-learn} para a implementação do algoritmo \textbf{HDBSCAN} como \textit{baseline} padrão.
+    \item \textbf{Interface Gráfica Interativa e Fiel ao Original}: Reconstrução do \textit{dashboard} de visualização utilizando a biblioteca \textbf{Plotly.js}. Restaurou-se o layout clássico de 3 painéis (Dendrograma de Meta-Clusters, Matriz de Similaridade HAI e Reachability Plots simultâneos), preservando a usabilidade e o esquema de cores preconizados no artigo original de 2017.
+    \item \textbf{Controle de Versão}: Estabelecimento de um fluxo de desenvolvimento profissional no GitHub (\url{https://github.com/Maylon-hub/mustache}), com separação clara entre o código legado (branch \texttt{legacy}) e a nova versão modernizada (branch \texttt{master}).
+\end{enumerate}
+
+\section{Resultados Obtidos}
+
+O principal resultado alcançado neste período é a entrega do \textbf{MustaCHE v2}, uma plataforma de análise de clustering totalmente funcional, modernizada e fiel visual e funcionalmente ao projeto original idealizado. Diferentemente da versão anterior, a nova ferramenta apresenta alta acessibilidade e estabilidade.
+
+\subsection{Nova Interface Gráfica}
+
+A interface foi redesenhada para oferecer uma experiência de usuário moderna, preservando o layout em três painéis original. A Figura \ref{fig:dashboard} ilustra o painel principal da aplicação, com a barra lateral ("sidebar") agora contendo também as logomarcas institucionais atualizadas em formato responsivo (MustaCHE, UFSCar, Newcastle, James Cook e University of Alberta).
+
+\begin{figure}[H]
+    \centering
+    % Substitua 'dashboard_v2.png' pelo nome do seu arquivo de imagem
+    % \includegraphics[width=1.0\textwidth]{dashboard_v2.png}
+    \fbox{\begin{minipage}[c][8cm]{1.0\textwidth}
+        \centering \vspace{3.5cm} [Inserir aqui: Captura de tela do Dashboard Principal do MustaCHE v2]
+    \end{minipage}}
+    \caption{Interface principal do MustaCHE v2, exibindo o painel de parâmetros e a área de visualização.}
+    \label{fig:dashboard}
+\end{figure}
+
+As visualizações interativas são o núcleo da ferramenta. A Figura \ref{fig:reachability} apresenta o novo \textit{Reachability Plot} interativo, que permite a inspeção detalhada da densidade dos clusters.
+
+\begin{figure}[H]
+    \centering
+    % Substitua 'reachability_v2.png' pelo nome do seu arquivo de imagem
+    % \includegraphics[width=0.8\textwidth]{reachability_v2.png}
+    \fbox{\begin{minipage}[c][6cm]{0.8\textwidth}
+        \centering \vspace{2.5cm} [Inserir aqui: Captura de tela do Reachability Plot Interativo]
+    \end{minipage}}
+    \caption{Reachability Plot gerado com Plotly.js, com coloração baseada nos clusters identificados.}
+    \label{fig:reachability}
+\end{figure}
+
+Além disso, a estrutura hierárquica dos agrupamentos pode ser analisada através do dendrograma, conforme mostrado na Figura \ref{fig:dendrogram}.
+
+\begin{figure}[H]
+    \centering
+    % Substitua 'dendrogram_v2.png' pelo nome do seu arquivo de imagem
+    % \includegraphics[width=0.8\textwidth]{dendrogram_v2.png}
+    \fbox{\begin{minipage}[c][6cm]{0.8\textwidth}
+        \centering \vspace{2.5cm} [Inserir aqui: Captura de tela do Dendrograma]
+    \end{minipage}}
+    \caption{Dendrograma de agrupamento hierárquico gerado pela nova ferramenta.}
+    \label{fig:dendrogram}
+\end{figure}
+
+\subsection{Funcionalidades Implementadas}
+
+As funcionalidades implementadas e validadas até o momento incluem:
+
+\begin{itemize}
+    \item \textbf{Pipeline Completo de Batch}: Execução automática, desde o upload de dados até o cálculo iterativo de clusterizações variando os parâmetros \textit{mpts}.
+    \item \textbf{Projeção 2D (t-SNE)}: Otimização da projeção t-SNE adaptativa para datasets pequenos, evitando loops e travamentos no sistema (ajuste de perplexidade dinâmica).
+    \item \textbf{Matriz HAI (Hierarchy Agreement Index)}: Implementação do cálculo de distâncias entre hierarquias para avaliar estabilidade de parâmetros, renderizado nativamente com mapa de calor (heatmap) via Plotly equipado com escala de cor precisa e marcadores adequados.
+    \item \textbf{Cortes Dinâmicos no Dendrograma}: Restauração da funcionalidade que permite ao usuário arrastar uma linha de corte ("threshold") interativa no dendrograma, recalculando no \textit{backend} (via SciPy) novos meta-clusters e atualizando os reachability plots baseados nos medoids imediatamente.
+    \item \textbf{Exportação de Dados}: Funcionalidade para exportar os resultados da análise e os parâmetros utilizados em formato JSON.
+\end{itemize}
+
+\section{Próximos Passos (Cronograma Futuro)}
+
+Para o restante do período de vigência da bolsa, o plano de trabalho foca na \textbf{Fase 2: Otimização e Comparação}, composta pelas seguintes atividades:
+
+\begin{enumerate}
+    \item \textbf{Integração do CORE-SG}: Implementar a lógica de grafos do CORE-SG na nova arquitetura em Python 3, substituindo ou complementando o módulo HDBSCAN padrão.
+    \item \textbf{Avaliação Comparativa}: Executar \textit{benchmarks} rigorosos de tempo de execução e consumo de memória entre a versão "Standard" (v2 atual) e a versão "Otimizada" (com CORE-SG).
+\end{enumerate}
+
+\end{document}

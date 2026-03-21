@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify
 import pandas as pd
+import time
 from .core import run_clustering
 from .core.batch import run_batch_clustering
 from scipy.cluster.hierarchy import fcluster
@@ -88,6 +89,7 @@ def batch_process():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
         
+    start_time = time.time()
     try:
         # Read CSV with header inference
         df = pd.read_csv(file)
@@ -121,15 +123,20 @@ def batch_process():
         if 'meta_linkage' in analysis:
             del analysis['meta_linkage']
         
+        exec_time = round(time.time() - start_time, 2)
+        
         return jsonify({
             'message': 'Batch clustering successful',
             'range': {'min': min_mpts, 'max': max_mpts, 'step': step},
             'results': results,
-            'analysis': analysis
+            'analysis': analysis,
+            'execution_time': exec_time
         })
 
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @main.route('/cut_dendrogram', methods=['POST'])

@@ -33,11 +33,18 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const formData = new FormData(e.target);
             const btn = e.target.querySelector('button[type="submit"]');
-
             // UI State
             const originalBtnHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            
+            // Timer Logic
+            const startTime = Date.now();
+            const timeDisplay = document.getElementById('proj-time');
+            const timerInterval = setInterval(() => {
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Processing (${elapsed}s)...`;
+                if (timeDisplay) timeDisplay.innerText = elapsed + 's';
+            }, 100);
 
             try {
                 const res = await fetch('/batch', { method: 'POST', body: formData });
@@ -49,9 +56,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 batchResults = data.results;
 
                 // Update Project Info Sidebar
-                const fileName = formData.get('file').name;
+                const fileName = formData.get('file')?.name || 'Uploaded File';
                 document.getElementById('proj-name').innerText = fileName;
                 document.getElementById('proj-min-mpts').innerText = formData.get('min_mpts');
+                if (timeDisplay && data.execution_time) {
+                    timeDisplay.innerText = data.execution_time + 's';
+                }
 
                 // Close Modal
                 $('#batchConfigModal').modal('hide');
@@ -137,6 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (err) {
                 alert('Batch Error: ' + err.message);
             } finally {
+                clearInterval(timerInterval);
                 btn.disabled = false;
                 btn.innerHTML = originalBtnHtml;
             }
