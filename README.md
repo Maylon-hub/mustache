@@ -189,7 +189,24 @@ Contributions welcome! Please:
 
 ## 📄 License
 
-[Add your license here]
+This project is licensed under the [BSD 3-Clause License](LICENSE).
+
+## 🎓 Citation
+
+If you use MustaCHE in your research, please cite the original paper:
+
+```bibtex
+@article{neto2018mustache,
+  title={MustaCHE: A Multiple Clustering Hierarchies Explorer},
+  author={Neto, Antonio Cavalcante Araujo and Nascimento, Mario A and Sander, Joerg and Campello, Ricardo JGB},
+  journal={Proceedings of the VLDB Endowment},
+  volume={11},
+  number={12},
+  pages={2058--2061},
+  year={2018},
+  publisher={VLDB Endowment}
+}
+```
 
 ## 🆘 Support
 

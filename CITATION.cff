@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: "Araujo Neto"
+    given-names: "Antonio Cavalcante"
+  - family-names: "Nascimento"
+    given-names: "Mario A."
+  - family-names: "Sander"
+    given-names: "Joerg"
+  - family-names: "Campello"
+    given-names: "Ricardo J. G. B."
+title: "MustaCHE: A Multiple Clustering Hierarchies Explorer"
+version: 2.0.0
+date-released: 2025-02-19
+url: "https://github.com/maylon-hub/mustache"
+license: BSD-3-Clause
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Araujo Neto"
+      given-names: "Antonio Cavalcante"
+    - family-names: "Nascimento"
+      given-names: "Mario A."
+    - family-names: "Sander"
+      given-names: "Joerg"
+    - family-names: "Campello"
+      given-names: "Ricardo J. G. B."
+  journal: "Proceedings of the VLDB Endowment"
+  title: "MustaCHE: A Multiple Clustering Hierarchies Explorer"
+  year: 2018
+  volume: 11
+  issue: 12
+  pages: 2058-2061
+  doi: "10.14778/3229863.3236259"
