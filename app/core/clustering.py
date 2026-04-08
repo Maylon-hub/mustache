@@ -50,10 +50,10 @@ def compute_mutual_reachability(data, min_samples, metric='euclidean'):
 
 
 
-def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean', true_labels=None):
+def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean', algorithm='hdbscan', true_labels=None):
 
     """
-    Runs HDBSCAN clustering on the provided DataFrame using scikit-learn.
+    Runs clustering on the provided DataFrame.
     Returns a dictionary with results.
     """
     # Convert DataFrame to numpy array
@@ -61,36 +61,46 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
     
     if data.size == 0 or data.shape[1] == 0:
         raise ValueError("No numerical data found for clustering. Please ensure the CSV contains numeric columns.")
-    
-    clusterer = HDBSCAN(
-        min_cluster_size=int(min_cluster_size),
-        min_samples=int(min_samples) if min_samples else None,
-        metric=metric,
-        store_centers='medoid'
-    )
-
-
-    
-    labels = clusterer.fit_predict(data)
-
-    
-    # Generate Linkage Matrix for Dendrogram (using scipy as proxy for visualization)
-    from scipy.cluster.hierarchy import linkage, dendrogram
-    import plotly.figure_factory as ff
-    
-    # Use 'single' linkage to mimic HDBSCAN's MST-based approach
-    # FIX: Use Mutual Reachability Distance instead of Euclidean Distance
-    # This ensures the hierarchy varies with min_samples (mpts)
-    
-    # MR Distance Matrix
+        
     m_samples_val = int(min_samples) if min_samples else int(min_cluster_size)
-    mreach_matrix = compute_mutual_reachability(data, m_samples_val, metric)
-    
-    # Condense for linkage (scipy expects condensed distance array)
-    condensed_mreach = squareform(mreach_matrix, checks=False)
 
-    
-    Z = linkage(condensed_mreach, method='single')
+    if algorithm == 'core-sg':
+        from core_sg import CoreSG
+        clusterer = CoreSG(
+            min_cluster_size=int(min_cluster_size),
+            metric=metric
+        )
+        clusterer.fit(data, m_samples_val)
+        h_obj = clusterer.get_fitted_hdbscan_objects()
+        
+        labels = h_obj['labels_']
+        probabilities = h_obj['probabilities_']
+        
+        Z = h_obj['single_linkage_tree_'].to_numpy().astype(float)
+        
+        import plotly.figure_factory as ff
+    else:
+        from sklearn.cluster import HDBSCAN
+        clusterer = HDBSCAN(
+            min_cluster_size=int(min_cluster_size),
+            min_samples=int(min_samples) if min_samples else None,
+            metric=metric,
+            store_centers='medoid'
+        )
+
+        labels = clusterer.fit_predict(data)
+        probabilities = clusterer.probabilities_
+        
+        from scipy.cluster.hierarchy import linkage, dendrogram
+        import plotly.figure_factory as ff
+        
+        # MR Distance Matrix
+        mreach_matrix = compute_mutual_reachability(data, m_samples_val, metric)
+        
+        # Condense for linkage (scipy expects condensed distance array)
+        condensed_mreach = squareform(mreach_matrix, checks=False)
+
+        Z = linkage(condensed_mreach, method='single')
 
 
     
@@ -236,7 +246,7 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
 
     return {
         'labels': labels.tolist(),
-        'probabilities': clusterer.probabilities_.tolist(),
+        'probabilities': probabilities.tolist(),
         'n_clusters': int(labels.max() + 1),
         'noise_points': int((labels == -1).sum()),
         'dendrogram_json': fig_dendro.to_json(),

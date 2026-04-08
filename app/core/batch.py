@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from .clustering import run_clustering
 
-def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean'):
+def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algorithm='hdbscan'):
     """
     Runs HDBSCAN for a range of mpts values.
     Returns a dictionary where keys are mpts values and values are clustering results.
@@ -27,7 +27,7 @@ def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean'):
         
         # Run clustering for this specific mpts
         try:
-            cluster_result = run_clustering(df, min_cluster_size=mpts, min_samples=mpts, metric=metric)
+            cluster_result = run_clustering(df, min_cluster_size=mpts, min_samples=mpts, metric=metric, algorithm=algorithm)
             results[str(mpts)] = cluster_result
         except Exception as e:
             print(f"Skipping mpts={mpts}: {str(e)}")

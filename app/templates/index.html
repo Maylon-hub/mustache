@@ -49,9 +49,22 @@
             </div>
             <div class="modal-body">
                 <form id="batch-form" enctype="multipart/form-data">
-                    <div class="form-group">
-                        <label>Dataset (CSV) <span class="required">*</span></label>
-                        <input type="file" class="form-control-file" name="file" required>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Dataset (CSV) <span class="required">*</span></label>
+                                <input type="file" class="form-control-file" name="file" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Algorithm</label>
+                                <select class="form-control" name="algorithm">
+                                    <option value="hdbscan">HDBSCAN</option>
+                                    <option value="core-sg">Core-SG</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <hr>
                     <div class="row">

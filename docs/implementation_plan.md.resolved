@@ -1,0 +1,58 @@
+# Integrar Core-SG ao MustaCHE v2
+
+A ferramenta **MustaCHE v2** (Multiple Cluster Hierarchies Explorer) que estamos desenvolvendo foi reimplementada a partir de sua versão original (em Python 2.7 e Java) para uma stack moderna (Python 3.11, Flask, Plotly.js). O foco principal do sistema é facilitar a análise de agrupamentos baseados em densidade, especificamente o HDBSCAN.
+
+O MustaCHE realiza um "meta-clustering" (um agrupamento de hierarquias de agrupamento). O usuário submete um limite de valores do parâmetro fundamentais como `min_cluster_size` do HDBSCAN, e o sistema constrói agrupamentos múltiplos. Usando uma métrica chamada HAI (Hierarchy Agreement Index), o sistema compara todas essas hierarquias e agrupa as que convergem para os mesmos resultados, mostrando medoides representativos, um dendrograma e os reachability plots, assim evitando que o cientista de dados analise manualmente dezenas de hierarquias isoladas.
+
+O objetivo do seu projeto PIBIC é resolver problemas de eficiência, e uma das grandes soluções propostas é substituir o HDBSCAN clássico pela biblioteca `core-sg`, desenvolvida pelo laboratório. Ela melhora a geração do limite de interconectividade calculando os kNNG exatos, evitando gargalos de escalabilidade.
+
+
+## Proposed Changes
+
+Esta implementação adicionará a capacidade de escolher entre as bibliotecas nos fluxos de Análise Única e em Lote.
+
+### Interface Frontend
+
+#### [MODIFY] [index.html](file:///home/aluno/GitHub/mustache/app/templates/index.html)
+Adicionar um `<select>` no modal do "*Run Batch*" para a seleção do algoritmo (HDBSCAN ou Core-SG). O "Core-SG" será adicionado à Interface Gráfica, acompanhado do aviso de limite de memória.
+
+#### [MODIFY] [dashboard.html](file:///home/aluno/GitHub/mustache/app/templates/dashboard.html)
+Adicionar o mesmo `<select>` de algoritmo para ambos os modais (Configuração de Análise Única e de Configuração de Batch).
+
+---
+
+### Backend Routes
+
+#### [MODIFY] [routes.py](file:///home/aluno/GitHub/mustache/app/routes.py)
+Capturar o parâmetro enviado pelas submissões dos formulários AJAX como `algorithm = request.form.get('algorithm', 'hdbscan')`. Passar esse valor adicional em todas as chamadas para as matrizes globais (`run_clustering` e `run_batch_clustering`).
+
+---
+
+### Processamento do Core-SG e HDBSCAN
+
+#### [MODIFY] [Dockerfile](file:///home/aluno/GitHub/mustache/Dockerfile)
+Adicionar a instrução de instalação via `pip` do `core-sg` utilizando os repositórios `--index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ core-sg` no estágio de construção da imagem Docker, garantindo que a aplicação conte com a dependência sem exigir instalações manuais, como sugerido.
+
+#### [MODIFY] [clustering.py](file:///home/aluno/GitHub/mustache/app/core/clustering.py)
+Alterar a função `run_clustering` para aceitar um argumento `algorithm='hdbscan'`.
+- Se for `'hdbscan'`, instacia o `HDBSCAN` do Scikit-Learn como já implementado.
+- Se for `'core-sg'`, instanciamos `core_sg.CoreSG(min_cluster_size=...)` e engatilharemos o `.fit(data, k_max)`.
+- Atualizaremos o método de geração do dendrograma (árvore de agrupamentos) utilizando os valores resultantes na `single_linkage_tree_` advindos de `get_fitted_hdbscan_objects()`, visto que eles evitam a ineficiência do cálculo da distância mútua densa do SciPy.
+
+#### [MODIFY] [batch.py](file:///home/aluno/GitHub/mustache/app/core/batch.py)
+Repassar o argumento de algoritmo de `run_batch_clustering(...)` para a sub-rotina respectiva do `run_clustering(..., algorithm=algorithm)`.
+
+
+## Open Questions
+
+> [!WARNING]  
+> Você comentou que o "CoreSG tem uma limitação de memória, por calcular os kNNG exato". De fato, essa implementação que o colega criou é restrita. Há algum tamanho ótimo ou número *MÁXIMO* de instâncias padrão que você gostaria que adicionemos como verificação na submissão do frontend, ou devemos deixar estourar erro de limite de memória com uma tratativa suave (ex. abortar a execução com um erro 400 avisando do tamanho)?
+
+## Verification Plan
+
+### Automated Tests
+- Testar a submissão de um arquivinho CSV (visto que não tem problemas de limite de MB, Core-SG performará).
+- Verificar se no retorno os JSONs de Reachability e o objeto Z geram o Output esperado na UI sem causar instabilidade no HAI.
+
+### Manual Verification
+- O usuário deve testar a versão modificada do *Dashboard*, executando "Single Analysis" com *ambos* os algoritmos para verificar a diferença.

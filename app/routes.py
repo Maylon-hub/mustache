@@ -67,9 +67,10 @@ def upload_file():
         min_cluster_size = request.form.get('min_cluster_size', 5)
         min_samples = request.form.get('min_samples', None)
         metric = request.form.get('metric', 'euclidean')
+        algorithm = request.form.get('algorithm', 'hdbscan')
         
         # Run clustering
-        results = run_clustering(df, min_cluster_size, min_samples, metric=metric, true_labels=true_labels)
+        results = run_clustering(df, min_cluster_size, min_samples, metric=metric, algorithm=algorithm, true_labels=true_labels)
         
         return jsonify({
             'message': 'Clustering successful',
@@ -106,9 +107,10 @@ def batch_process():
         max_mpts = int(request.form.get('max_mpts', 10)) # Default small range for testing
         step = int(request.form.get('step', 1))
         metric = request.form.get('metric', 'euclidean')
+        algorithm = request.form.get('algorithm', 'hdbscan')
         
         # Run batch clustering
-        results = run_batch_clustering(df, min_mpts, max_mpts, step, metric=metric)
+        results = run_batch_clustering(df, min_mpts, max_mpts, step, metric=metric, algorithm=algorithm)
         
         # Run meta-analysis
         from .core.batch import analyze_batch_results

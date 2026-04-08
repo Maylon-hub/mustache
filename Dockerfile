@@ -24,6 +24,7 @@ RUN cythonize -i -3 legacy/mustache/resources/*.pyx || echo "Cython compilation 
 COPY requirements.txt .
 # Install into a user directory to easily copy later
 RUN pip install --no-cache-dir --target=/install -r requirements.txt
+RUN pip install --no-cache-dir --target=/install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ core-sg
 
 # Stage 2: Runtime
 FROM python:3.11-slim
