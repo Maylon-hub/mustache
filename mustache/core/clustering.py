@@ -193,19 +193,27 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
     )
 
     # Generate 2D Projection (t-SNE)
-    from sklearn.manifold import TSNE
-    
-    # Use t-SNE to project data to 2D
-    # Perplexity should be considerably less than number of samples to prevent hanging on small data.
-    n_samples = data.shape[0]
-    perplexity = min(30, max(1, n_samples // 3))
-    
-    # Use exact method for tiny datasets to prevent barnes_hut bugs
-    method = 'exact' if n_samples < 50 else 'barnes_hut'
-    
-    tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42, method=method, init='pca')
-    projection = tsne.fit_transform(data)
-
+    try:
+        from sklearn.manifold import TSNE
+        n_samples = data.shape[0]
+        perplexity = min(30, max(1, n_samples // 3))
+        
+        # Use exact method for tiny datasets to prevent barnes_hut bugs
+        method = 'exact' if n_samples < 50 else 'barnes_hut'
+        
+        # PCA initialization requires at least as many features as n_components (2)
+        init_method = 'random' if data.shape[1] < 2 or n_samples < 2 else 'pca'
+        
+        tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42, method=method, init=init_method)
+        projection = tsne.fit_transform(data)
+    except Exception as e:
+        print(f"Warning: t-SNE projection failed: {e}. Generating fallback projection.")
+        if data.shape[1] >= 2:
+            projection = data[:, :2]
+        elif data.shape[1] == 1:
+            projection = np.column_stack((data[:, 0], np.zeros(data.shape[0])))
+        else:
+            projection = np.zeros((data.shape[0], 2))
     
     fig_map = go.Figure()
     fig_map.add_trace(go.Scatter(

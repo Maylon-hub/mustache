@@ -2,6 +2,9 @@
 import numpy as np
 import pandas as pd
 from .clustering import run_clustering
+from scipy.cluster.hierarchy import linkage, dendrogram as sp_dendrogram
+from scipy.spatial.distance import squareform
+from sklearn.cluster import HDBSCAN
 
 def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algorithm='core-sg'):
     """
@@ -76,41 +79,67 @@ def analyze_batch_results(batch_results):
     # Meta-Clustering
     meta_labels, meta_linkage = run_meta_clustering(hai_matrix)
     
-    # Generate Meta-Dendrogram (Plotly)
-    # pyrefly: ignore [import-untyped, missing-import]
-    import plotly.figure_factory as ff
-    # We need to map leaf indices to our sorted mpts keys for the labels
+    # Generate Meta-Dendrogram (Plotly) using scipy dendrogram coordinates.
+    # We avoid ff.create_dendrogram because it serializes traces with y as a dict
+    # (not a list), which breaks JavaScript iteration. Instead, we build the figure
+    # manually from scipy's icoord/dcoord layout arrays.
+    import plotly.graph_objects as go
+    from scipy.cluster.hierarchy import dendrogram as sp_dendrogram
+    
     dendro_labels = [str(k) for k in sorted_keys]
     
-    # ff.create_dendrogram expects data (X) to compute linkage, OR a custom linkage matrix.
-    # However, ff.create_dendrogram with linkagefun is tricky if we already have Z.
-    # It calculates Z internally usually.
-    # Workaround: Use scipy.cluster.hierarchy.dendrogram to get coordinates or build manually?
-    # Actually, ff.create_dendrogram HAS a linkagefun argument, but it expects a function that *returns* Z.
-    # So we can pass lambda x: meta_linkage.
-    # BUT, meta_linkage from HDBSCAN might have slightly different format or scikit-learn vs scipy differences.
-    # HDBSCAN's single_linkage_tree_ is a standard linkage matrix (4 columns).
-    
     try:
-        # Note: ff.create_dendrogram computes dist matrix if X is passed. 
-        # If we want to use OUR Z, we must trick it.
-        # Function to return our Z
-        get_z = lambda x: np.array(meta_linkage)
+        Z = np.array(meta_linkage)
         
-        # We pass dummy data of correct shape (N_samples, something) just to satisfy shape checks if any
-        dummy_X = np.zeros((len(sorted_keys), 1))
+        # Get dendrogram coordinate layout from scipy (no rendering)
+        ddict = sp_dendrogram(Z, labels=dendro_labels, no_plot=True)
         
-        fig_meta_dendro = ff.create_dendrogram(dummy_X, linkagefun=get_z, labels=dendro_labels)
-        fig_meta_dendro.update_layout(
+        icoord = np.array(ddict['icoord'])  # X-coords of each branch (N-1 x 4)
+        dcoord = np.array(ddict['dcoord'])  # Y-coords (heights) of each branch (N-1 x 4)
+        leaf_labels = ddict['ivl']           # Leaf labels in left-to-right order
+        
+        # Build one Scatter trace per branch (each row of icoord/dcoord is one U-shape)
+        traces = []
+        for xs, ys in zip(icoord.tolist(), dcoord.tolist()):
+            traces.append(go.Scatter(
+                x=xs,
+                y=ys,
+                mode='lines',
+                line=dict(color='#2196F3', width=2),
+                hoverinfo='skip',
+                showlegend=False
+            ))
+        
+        # X-axis tick positions: scipy places leaves at 5, 15, 25, ... (10 apart)
+        n_leaves = len(leaf_labels)
+        tick_vals = [10 * i + 5 for i in range(n_leaves)]
+        
+        layout = go.Layout(
             template='plotly_white',
             title='Meta-Clustering Dendrogram (Hierarchies)',
-            xaxis_title='mpts Parameter',
-            yaxis_title='Distance',
-            margin=dict(l=20, r=20, t=40, b=50)
+            xaxis=dict(
+                tickvals=tick_vals,
+                ticktext=leaf_labels,
+                title='mpts Parameter',
+                showgrid=False,
+                zeroline=False
+            ),
+            yaxis=dict(
+                title='Distance (1 - HAI)',
+                showgrid=True,
+                zeroline=True,
+                rangemode='tozero'
+            ),
+            margin=dict(l=50, r=20, t=50, b=60),
+            hovermode=False
         )
+        
+        fig_meta_dendro = go.Figure(data=traces, layout=layout)
         meta_dendro_json = fig_meta_dendro.to_json()
+        print(f"Meta-dendrogram built: {len(traces)} branches, leaves={leaf_labels}")
     except Exception as e:
         print(f"Error generating meta-dendrogram: {e}")
+        import traceback; traceback.print_exc()
         meta_dendro_json = None
     
     # Medoids

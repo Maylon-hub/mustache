@@ -55,6 +55,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 latestAnalysis = data.analysis;
                 batchResults = data.results;
 
+                if (latestAnalysis && latestAnalysis.error) {
+                    throw new Error(latestAnalysis.error);
+                }
+
                 // Update Project Info Sidebar
                 const fileName = formData.get('file')?.name || 'Uploaded File';
                 document.getElementById('proj-name').innerText = fileName;
@@ -77,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     let maxY = 0;
                     if (figure.data) {
                         figure.data.forEach(trace => {
-                            if (trace.y) {
+                            if (Array.isArray(trace.y) && trace.y.length > 0) {
                                 const max_val = Math.max(...trace.y);
                                 if (max_val > maxY) maxY = max_val;
                             }
