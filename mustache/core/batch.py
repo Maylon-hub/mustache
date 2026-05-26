@@ -1,8 +1,9 @@
+# pyrefly: ignore [missing-import]
 import numpy as np
 import pandas as pd
 from .clustering import run_clustering
 
-def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algorithm='hdbscan'):
+def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algorithm='core-sg'):
     """
     Runs HDBSCAN for a range of mpts values.
     Returns a dictionary where keys are mpts values and values are clustering results.
@@ -76,6 +77,7 @@ def analyze_batch_results(batch_results):
     meta_labels, meta_linkage = run_meta_clustering(hai_matrix)
     
     # Generate Meta-Dendrogram (Plotly)
+    # pyrefly: ignore [import-untyped, missing-import]
     import plotly.figure_factory as ff
     # We need to map leaf indices to our sorted mpts keys for the labels
     dendro_labels = [str(k) for k in sorted_keys]

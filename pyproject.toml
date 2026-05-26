@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mustache-core"
+version = "0.1.0"
+description = "MustaCHE (Multiple Cluster Hierarchies Explorer) integrated with Core-SG"
+authors = [
+    {name = "MustaCHE Authors", email = "authors@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Flask>=3.0.0",
+    "core-sg",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "scipy",
+    "plotly"
+]
+
+[project.scripts]
+mustache = "mustache.cli:main"
+
+[tool.setuptools]
+packages = ["mustache", "mustache.core"]
+
+[tool.setuptools.package-data]
+mustache = ["static/**/*", "templates/**/*"]

@@ -50,7 +50,7 @@ def compute_mutual_reachability(data, min_samples, metric='euclidean'):
 
 
 
-def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean', algorithm='hdbscan', true_labels=None):
+def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean', algorithm='core-sg', true_labels=None):
 
     """
     Runs clustering on the provided DataFrame.
