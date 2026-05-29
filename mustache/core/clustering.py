@@ -166,13 +166,25 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
     reachability = optics.reachability_[optics.ordering_]
     labels_optics = optics.labels_[optics.ordering_]
     
+    # Clean np.inf values that squash the reachability plot's visual scale.
+    # Replace np.inf with a reasonable visual ceiling (1.1 * max_non_infinite_distance).
+    non_inf_mask = np.isfinite(reachability)
+    if np.any(non_inf_mask):
+        max_reach = np.max(reachability[non_inf_mask])
+        # If all finite are very small or zero, use a default minimum ceiling
+        ceiling = max(max_reach * 1.1, 1.0)
+    else:
+        ceiling = 1.0
+        
+    reachability_clean = np.where(np.isinf(reachability), ceiling, reachability)
+    
     # Use HDBSCAN labels for coloring instead of OPTICS labels for consistency
     ordered_hdbscan_labels = labels[optics.ordering_]
     
     fig_reach = go.Figure()
     fig_reach.add_trace(go.Bar(
-        x=list(range(len(reachability))),
-        y=reachability,
+        x=list(range(len(reachability_clean))),
+        y=reachability_clean,
         marker=dict(
             color=ordered_hdbscan_labels,  # Color by HDBSCAN clusters
             colorscale='Viridis', 
