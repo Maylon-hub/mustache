@@ -1,0 +1,8 @@
+import base64
+import numpy as np
+
+bdata = "KTFPwN5bJECy9qT7H5EGQLL2pPsfkQZAYW0PxuNCAEASQrU0yoX/PxfoNIXnkPw/F+g0heeQ/D8X6DSF55D8PxfoNIXnkPw/F+g0heeQ/D8X6DSF55D8PxfoNIXnkPw/F+g0heeQ/D8X6DSF55D8PxfoNIXnkPw/F+g0heeQ/D8X6DSF55D8PxfoNIXnkPw/F+g0heeQ/D8ra0FP4838PytrQU/jzfw/WTSGWYhV/T9ZNIZZiFX9P1k0hlmIVf0/Tee58V1G/j8mqLqqcqIBQDY5sFQ4IAlAbPZ3TuFVB0Bs9ndO4VUHQKkTI+7rHwVAUokrqba+A0BSiSuptr4DQGp9cnfk3QJAan1yd+TdAkCam6kQlSsBQJqbqRCVKwFAmpupEJUrAUCam6kQlSsBQJqbqRCVKwFAmpupEJUrAUCaqRXV2oj+P5qpFdXaiP4/mqkV1dqI/j+aqRXV2oj+P5qpFdXaiP4/mqkV1dqI/j+2DH2W3Fb/PzovhY0JvABAOi+FjQm8AEA6L4WNCbwAQJqJu8ACVxpAQIbtYAjuBEAOwOwjv4IDQA7A7CO/ggNAprxZ4p8ZAkCmvFninxkCQKa8WeKfGQJAprxZ4p8ZAkA13Uqe0ev8PzXdSp7R6/w/Nd1KntHr/D813Uqe0ev8PzXdSp7R6/w/Nd1KntHr/D813Uqe0ev8PzXdSp7R6/w/Nd1KntHr/D813Uqe0ev8P/cHvIFz0v0/ig4Svdg+AEA8DJjpAjgBQKa8WeKfGQJAB8zsyIi7A0A8W7xREIIiQDFVBRfluwlAWYBQGsMEAkBAyVpeJ6EAQOHD0bpHpfQ/4cPRukel9D/hw9G6R6X0P+HD0bpHpfQ/4cPRukel9D/hw9G6R6X0P+HD0bpHpfQ/4cPRukel9D/hw9G6R6X0P+HD0bpHpfQ/4cPRukel9D/hw9G6R6X0P+HD0bpHpfQ/4cPRukel9D/e3tDEp7P0P57e0MSns/Q/7bWy4YSH9T9rlxTmoDb2P99W5EHbGvw/XA6orW38/D9ZWKdmghL9PyRXOIvgdP8/gzDeLH5nAEA="
+raw_bytes = base64.b64decode(bdata)
+array = np.frombuffer(raw_bytes, dtype='float64')
+print("Decoded array length:", len(array))
+print("Decoded array values:", list(array))

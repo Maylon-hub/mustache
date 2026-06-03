@@ -3,6 +3,7 @@ from sklearn.cluster import HDBSCAN
 
 import pandas as pd
 import numpy as np
+import time
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
 from sklearn.neighbors import NearestNeighbors
 from scipy.spatial.distance import pdist, squareform
@@ -50,7 +51,7 @@ def compute_mutual_reachability(data, min_samples, metric='euclidean'):
 
 
 
-def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean', algorithm='core-sg', true_labels=None):
+def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean', algorithm='core-sg', true_labels=None, precomputed_optics=None):
 
     """
     Runs clustering on the provided DataFrame.
@@ -64,7 +65,9 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         
     m_samples_val = int(min_samples) if min_samples else int(min_cluster_size)
 
+    t_clustering_start = time.time()
     if algorithm == 'core-sg':
+        # pyrefly: ignore [missing-import]
         from core_sg import CoreSG
         clusterer = CoreSG(
             min_cluster_size=int(min_cluster_size),
@@ -101,6 +104,7 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         condensed_mreach = squareform(mreach_matrix, checks=False)
 
         Z = linkage(condensed_mreach, method='single')
+    clustering_time = time.time() - t_clustering_start
 
 
     
@@ -152,19 +156,22 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         marker_color='#097B43'
     ))
     
-    # Better approach: Use HDBSCAN's single_linkage_tree_ if we switch back to hdbscan library,
-    # but with sklearn's HDBSCAN, we might not have it exposed easily in the same way 
-    # without 'gen_min_span_tree=True' which isn't in sklearn's version yet (it uses a different backend).
-    
     # Alternative: Use OPTICS from sklearn for the reachability plot specifically, 
     # as it's the standard for that visualization.
-    from sklearn.cluster import OPTICS
-    optics = OPTICS(min_samples=int(min_samples) if min_samples else 5, metric=metric)
-    optics.fit(data)
-
+    if precomputed_optics is not None:
+        reachability_raw, ordering, optics_time = precomputed_optics
+    else:
+        t_optics_start = time.time()
+        from sklearn.cluster import OPTICS
+        optics = OPTICS(min_samples=int(min_samples) if min_samples else 5, metric=metric)
+        optics.fit(data)
+        optics_time = time.time() - t_optics_start
+        reachability_raw = optics.reachability_
+        ordering = optics.ordering_
+ 
     
-    reachability = optics.reachability_[optics.ordering_]
-    labels_optics = optics.labels_[optics.ordering_]
+    reachability = reachability_raw[ordering]
+    labels_optics = None # We don't need optics labels since we color by HDBSCAN/CoreSG
     
     # Clean np.inf values that squash the reachability plot's visual scale.
     # Replace np.inf with a reasonable visual ceiling (1.1 * max_non_infinite_distance).
@@ -179,14 +186,14 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
     reachability_clean = np.where(np.isinf(reachability), ceiling, reachability)
     
     # Use HDBSCAN labels for coloring instead of OPTICS labels for consistency
-    ordered_hdbscan_labels = labels[optics.ordering_]
+    ordered_hdbscan_labels = labels[ordering]
     
     fig_reach = go.Figure()
     fig_reach.add_trace(go.Bar(
         x=list(range(len(reachability_clean))),
-        y=reachability_clean,
+        y=reachability_clean.tolist(),
         marker=dict(
-            color=ordered_hdbscan_labels,  # Color by HDBSCAN clusters
+            color=ordered_hdbscan_labels.tolist(),  # Color by HDBSCAN clusters
             colorscale='Viridis', 
             line=dict(width=0),
             showscale=True,
@@ -203,7 +210,7 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         margin=dict(l=20, r=20, t=40, b=20),
         height=400
     )
-
+ 
     # Generate 2D Projection (t-SNE)
     try:
         from sklearn.manifold import TSNE
@@ -229,12 +236,12 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
     
     fig_map = go.Figure()
     fig_map.add_trace(go.Scatter(
-        x=projection[:, 0],
-        y=projection[:, 1],
+        x=projection[:, 0].tolist(),
+        y=projection[:, 1].tolist(),
         mode='markers',
         marker=dict(
             size=8,
-            color=labels, # Color by cluster label
+            color=labels.tolist(), # Color by cluster label
             colorscale='Viridis',
             showscale=True,
             line=dict(width=1, color='DarkSlateGrey')
@@ -273,6 +280,8 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         'reachability_json': fig_reach.to_json(),
         'map_json': fig_map.to_json(),
         'metrics': metrics,
-        'linkage_z': Z.tolist()
+        'linkage_z': Z.tolist(),
+        'optics_time': round(optics_time, 4),
+        'clustering_time': round(clustering_time, 4)
     }
 
