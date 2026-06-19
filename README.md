@@ -1,199 +1,160 @@
-# MustaCHE v2
+# MustaCHE (Multiple Cluster Hierarchies Explorer)
 
-**MustaCHE** (Multiple Cluster Hierarchies Explorer) is a web-based tool for analyzing hierarchical density-based clustering using HDBSCAN algorithm with interactive visualizations.
+**MustaCHE** is an interactive, web-based visualization tool designed for exploring hierarchical density-based clustering. It allows users to analyze multiple clustering hierarchies generated under a wide range of density parameters ($m_{pts}$) simultaneously, offering key insights into cluster stability and dataset structure. 
 
-![MustaCHE Logo](app/static/img/LOGO.png)
+In this version (**MustaCHE v2**), the application has been completely re-engineered from its legacy Java and Python 2.7 codebase into a native, high-performance Python 3.11 stack. It is now fully integrated with the state-of-the-art **Core-SG (Core Structure Graph)** engine for fast MST (Minimum Spanning Tree) computations, and is designed to run natively as a packaged Python application.
 
-## 🌟 Features
+---
 
-- **HDBSCAN Clustering**: State-of-the-art density-based clustering
-- **Interactive Visualizations**:
-  - Reachability Plot (cluster density visualization)
-  - 2D Projection Map (t-SNE)
-  - Hierarchical Dendrogram
-- **Ground Truth Validation**: Upload known labels for ARI/AMI metrics
-- **Multiple Distance Metrics**: Euclidean, Manhattan
-- **Export Results**: Download analysis as JSON
+## 🌟 Key Features
 
-## 🚀 Quick Start (Easiest Way)
+- **Core-SG & HDBSCAN Clustering**: Integrated with the advanced `core-sg` engine for extremely fast calculations of multiple MSTs, scaling seamlessly to larger datasets.
+- **Ultra-Fast Reachability Plots**: Employs an optimized OPTICS bypass caching mechanism, accelerating the batch reachability calculation by up to **91% (~11x speedup)**.
+- **Interactive Visualizations (Plotly.js)**:
+  - **Dendrogram of Meta-Clusters**: Visualizes how hierarchies group together and lets you select dynamic cutting thresholds.
+  - **HAI Similarity Matrix**: Visualizes structural agreement between clustering partitions across parameter variations.
+  - **Interactive Reachability Plot**: Identifies valley structures indicating density-based clusters.
+  - **2D Projection Scatter Map**: Powered by t-SNE for dimensional projection.
+- **Ground Truth Validation**: Upload known labels for automatic Adjusted Rand Index (ARI) and Adjusted Mutual Info (AMI) calculation.
+- **Python Packaging & CLI**: Fully packaged library that can be launched directly using the `mustache` command line interface.
+
+---
+
+## 🚀 Running Locally (For Developers)
+
+To run the application locally on your machine from the source code, follow these steps:
 
 ### Prerequisites
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed
-- Git (optional, for cloning)
+- **Python >= 3.10** installed.
+- Git (for cloning the repositories).
 
 ### Installation Steps
 
-1. **Download MustaCHE**:
+1. **Clone the repositories**:
+   Ensure you have both the `mustache` repository and its companion dependency `core-sg` cloned in the same directory:
    ```bash
-   git clone https://github.com/maylon-hub/mustache.git
+   git clone https://github.com/Maylon-hub/core-sg.git
+   git clone https://github.com/Maylon-hub/mustache.git
+   ```
+
+2. **Set up a Virtual Environment**:
+   Navigate to the `mustache` directory, create and activate a virtual environment:
+   ```bash
    cd mustache
-   ```
+   python -m venv venv
    
-   *Or download as ZIP and extract*
+   # On Windows (PowerShell):
+   .\venv\Scripts\Activate.ps1
+   
+   # On Linux/macOS:
+   source venv/bin/activate
+   ```
 
-2. **Start MustaCHE**:
-   
-   **Windows (PowerShell)**:
-   ```powershell
-   .\run.ps1
-   ```
-   
-  or (in case of permission errors):
-
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\run.ps1
-   ```
-  
-   
-   **Linux/Mac**:
+3. **Install Core-SG in Editable Mode**:
+   Install the adjacent `core-sg` dependency in your active virtual environment:
    ```bash
-   chmod +x run.sh
-   ./run.sh
+   pip install -e ../core-sg
    ```
 
-3. **Access** → Open browser at: **http://localhost:5001**
+4. **Install MustaCHE in Editable Mode**:
+   Install `mustache-core` and its required packages:
+   ```bash
+   pip install -e .
+   ```
 
-That's it! 🎉
+5. **Start the Application**:
+   You can launch the server using the command-line utility:
+   ```bash
+   mustache --port 5000
+   ```
+   *Alternatively*, you can run the entry script directly:
+   ```bash
+   python mustache/cli.py
+   ```
 
-## 🛠️ Manual Setup (Without Scripts)
+6. **Access the Interface**:
+   Open your web browser and navigate to **`http://127.0.0.1:5000`**.
 
-If you prefer manual control:
+---
 
+## 📦 Installation via PyPI (Once Published)
+
+Once published on PyPI, users will be able to install and run the tool globally with a single command without dealing with cloning repositories manually.
+
+### Installation
 ```bash
-# Build  and run with Docker Compose
-docker compose up --build -d
-
-# Access at http://localhost:5001
-
-# Stop when done
-docker compose down
+pip install mustache-core
 ```
+
+### Running the App
+After installation, the CLI tool will be registered on your system path. Simply run:
+```bash
+mustache
+```
+You can customize the host, port, and run mode using command line flags:
+```bash
+mustache --host 0.0.0.0 --port 8080 --debug
+```
+
+---
 
 ## 📖 Usage Guide
 
 ### 1. Upload Dataset
-- Click "Choose File" under **Dataset (CSV)**
-- Select a CSV file with numerical features (no headers)
-- Example format:
-  ```
-  1.2,3.4,5.6
-  2.1,4.3,6.5
+- Under the **Dataset (CSV)** input, choose a numerical dataset file (no headers, values separated by commas).
+- Example formatting:
+  ```csv
+  0.23,1.45,-0.67
+  0.11,2.02,-0.12
   ...
   ```
 
 ### 2. (Optional) Upload Ground Truth Labels
-- Click "Choose File" under **Ground Truth Labels**
-- Upload CSV file with one label per line
-- This enables validation metrics (ARI, AMI)
+- Upload a single-column CSV with integer labels representing the ground truth.
+- This will enable automatic calculation and display of clustering validation metrics (ARI, AMI).
 
-### 3. Configure Parameters
-- **Min Cluster Size**: Minimum points to form a cluster (default: 5)
-- **Min Samples**: Neighborhood size (default: 5)
-- **Distance Metric**: Choose Euclidean or Manhattan
+### 3. Adjust Parameters & Run
+- **Min Cluster Size**: Minimum size to form a density cluster.
+- **Min Samples**: Controls the tolerance for noise points.
+- **Distance Metric**: Euclidean or Manhattan.
+- **Algorithm**: Select `core-sg` for accelerated MST processing or `standard` for classical Scikit-Learn HDBSCAN.
+- Click **"Run Clustering"** to execute the pipeline and render interactive charts.
 
-### 4. Run Analysis
-- Click **"Run Clustering"**
-- Wait for processing (usually < 5 seconds)
-- Explore interactive visualizations!
+### 4. Batch Parameter Exploration
+- Use the **Batch mode** to specify a range of values for $m_{pts}$ (e.g., Min: 5, Max: 30, Step: 2).
+- MustaCHE will calculate clustering hierarchies for all parameters, compute the pairwise agreement matrix (HAI), construct the meta-clustering dendrogram, and cache the reachability plot to show how hierarchies evolve.
 
-### 5. Export Results
-- Click **"Export JSON"** to download full analysis
-- Includes parameters, labels, metrics, and plot data
+---
 
-## 📁 Project Structure
+## 📁 Project Directory Structure
 
 ```
 mustache/
-├── app/                    # Flask application
-│   ├── static/
-│   │   ├── css/           # Stylesheets
-│   │   ├── js/            # JavaScript
-│   │   └── img/           # Logos and images
-│   ├── templates/          # HTML templates
-│   ├── core.py            # Clustering logic
-│   └── routes.py          # API endpoints
-├── datasets/              # Sample datasets
-├── legacy/                # Original codebase (archived)
-├── Dockerfile             # Docker configuration
-├── docker-compose.yml     # Multi-container setup
-├── requirements.txt       # Python dependencies
-├── run.py                 # Flask entry point
-├── run.ps1               # Windows startup script
-└── run.sh                # Linux/Mac startup script
+├── datasets/             # Sample datasets for demonstration
+├── mustache/             # Core Python package modules
+│   ├── core/             # Mathematical algorithms (clustering, HAI, batch logic)
+│   ├── static/           # UI CSS, dynamic Javascript, and logos
+│   ├── templates/        # Flask HTML layouts
+│   ├── cli.py            # CLI launcher setup
+│   └── routes.py         # Flask API controllers and routing
+├── pyproject.toml        # Build metadata configuration
+├── requirements.txt      # Dev environment dependency lock
+└── README.md             # Project documentation
 ```
 
-## 🔧 Advanced Configuration
+---
 
-### Port Configuration
-Change the port in `docker-compose.yml`:
-```yaml
-ports:
-  - "YOUR_PORT:5000"
-```
+## 📄 License & Credits
 
-### Python Dependencies
-Edit `requirements.txt` and rebuild:
-```bash
-docker compose up --build -d
-```
+- **Original concept and code**: Araujo Neto, Antonio Cavalcante, Mario A. Nascimento, Joerg Sander, and Ricardo J. G. B. Campello (2018).
+- **Reengineered Version**: Maylon Martins de Melo (2025-2026).
+- **License**: Licensed under the [BSD 3-Clause License](LICENSE).
 
-## 🐛 Troubleshooting
-
-### Port Already in Use
-```bash
-# Stop existing container
-docker compose down
-
-# Or change port in docker-compose.yml
-```
-
-### Docker Not Running
-Make sure Docker Desktop is open and running.
-
-### File Upload Errors
-- Ensure CSV files are properly formatted
-- Check that numerical data has no headers
-- Verify file encoding is UTF-8
-
-### Container Rebuild
-If changes don't appear:
-```bash
-docker compose down
-docker compose up --build -d --force-recreate
-```
-
-## 📊 Sample Data
-
-Try the included sample dataset:
-- **Dataset**: `datasets/sample_data.csv` (11 points, 2D)
-- **Labels**: `datasets/sample_labels.csv` (3 clusters)
-
-## 🤝 Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## 📝 Credits
-
-**Original Concept**: Antonio Cavalcante and others (2017)
-
-**Institutions**:
-- Federal University of São Carlos (UFSCar)
-- Newcastle University
-- James Cook University
-
-**Rebuilt by**: Maylon Martins de Melo (2025)
-
-## 📄 License
-
-This project is licensed under the [BSD 3-Clause License](LICENSE).
+---
 
 ## 🎓 Citation
 
-If you use MustaCHE in your research, please cite the original paper:
+If you use MustaCHE in your research or applications, please cite the original publication:
 
 ```bibtex
 @article{neto2018mustache,
@@ -207,14 +168,3 @@ If you use MustaCHE in your research, please cite the original paper:
   publisher={VLDB Endowment}
 }
 ```
-
-## 🆘 Support
-
-For issues and questions:
-- Open an issue on GitHub
-- Check the [troubleshooting section](#-troubleshooting)
-
----
-
-**Version**: 2.0  
-**Tech Stack**: Flask + Python 3.11 + scikit-learn + Plotly.js + Docker

@@ -1,0 +1,2 @@
+recursive-include mustache/static *
+recursive-include mustache/templates *
