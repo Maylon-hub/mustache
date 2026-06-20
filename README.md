@@ -1,199 +1,118 @@
-# MustaCHE v2
+# MustaCHE v2 (Multiple Cluster Hierarchies Explorer)
 
-**MustaCHE** (Multiple Cluster Hierarchies Explorer) is a web-based tool for analyzing hierarchical density-based clustering using HDBSCAN algorithm with interactive visualizations.
+**MustaCHE** é uma ferramenta interativa e baseada em web para exploração e análise visual de múltiplos agrupamentos hierárquicos baseados em densidade (HDBSCAN). Ele permite analisar a estabilidade de agrupamentos sob diversas variações de parâmetros simultaneamente.
 
-![MustaCHE Logo](app/static/img/LOGO.png)
+Nesta versão v2, o projeto foi reengenheirado de sua base legado (Java/Python 2.7) para um **pacote Python nativo** integrado ao motor de alto desempenho **Core-SG** para o cálculo acelerado de Árvores Geradoras Mínimas (MST).
 
-## 🌟 Features
+---
 
-- **HDBSCAN Clustering**: State-of-the-art density-based clustering
-- **Interactive Visualizations**:
-  - Reachability Plot (cluster density visualization)
-  - 2D Projection Map (t-SNE)
-  - Hierarchical Dendrogram
-- **Ground Truth Validation**: Upload known labels for ARI/AMI metrics
-- **Multiple Distance Metrics**: Euclidean, Manhattan
-- **Export Results**: Download analysis as JSON
+## 🌟 Recursos Principais
 
-## 🚀 Quick Start (Easiest Way)
+* **Motor Principal Core-SG**: Integração com a biblioteca de aceleração de grafos e cálculo de MSTs.
+* **Interface CLI Simples**: Suba o servidor local executando apenas um comando no terminal.
+* **Visualizações Interativas (Plotly)**:
+  * **Dendrograma de Meta-Agrupamentos**: Visualize a evolução das partições e defina limites dinâmicos de corte.
+  * **Matriz de Similaridade HAI**: Analise a concordância estrutural entre diferentes valores de parâmetros.
+  * **Gráfico de Acessibilidade (Reachability Plot)**: Detecte estruturas de vales que revelam grupos densos.
+  * **Projeção 2D (t-SNE)**: Visualize a distribuição espacial dos pontos e coloração por grupo.
+* **Validação Científica**: Suporte para upload de rótulos reais (*ground truth*) e cálculo automático de métricas (ARI e AMI).
 
-### Prerequisites
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed
-- Git (optional, for cloning)
+---
 
-### Installation Steps
+## 📦 Instalação
 
-1. **Download MustaCHE**:
-   ```bash
-   git clone https://github.com/maylon-hub/mustache.git
-   cd mustache
-   ```
-   
-   *Or download as ZIP and extract*
+### Pré-requisitos
+* **Python >= 3.10** instalado em sua máquina.
 
-2. **Start MustaCHE**:
-   
-   **Windows (PowerShell)**:
-   ```powershell
-   .\run.ps1
-   ```
-   
-  or (in case of permission errors):
+### ⚠️ Importante sobre a Compilação do Core-SG
+O **Core-SG** é o motor de agrupamento obrigatório e principal do MustaCHE. Ele possui módulos de desempenho escritos em Cython (`.pyx`) que requerem compilação.
+* **Python 3.10 a 3.12**: Possuem rodas pré-compiladas (*wheels*) disponíveis no PyPI para as plataformas mais comuns, instalando instantaneamente.
+* **Python 3.13 ou plataformas sem wheels pré-compiladas**: O `pip` tentará compilar o código fonte do `core-sg` localmente. Para isso, você precisará de compiladores C++ instalados no sistema operacional:
+  * **Windows**: Instale o [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (selecione a opção "Desenvolvimento para desktop com C++").
+  * **Linux (Ubuntu/Debian)**: Rode `sudo apt install build-essential`.
+  * **macOS**: Instale o Xcode Command Line Tools executando `xcode-select --install` no terminal.
 
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\run.ps1
-   ```
-  
-   
-   **Linux/Mac**:
-   ```bash
-   chmod +x run.sh
-   ./run.sh
-   ```
-
-3. **Access** → Open browser at: **http://localhost:5001**
-
-That's it! 🎉
-
-## 🛠️ Manual Setup (Without Scripts)
-
-If you prefer manual control:
+### Passo 1: Instalação via Pip
+Como o pacote é publicado no **TestPyPI** para validação, utilize o comando abaixo para puxar o pacote base e suas dependências de terceiros do PyPI principal:
 
 ```bash
-# Build  and run with Docker Compose
-docker compose up --build -d
-
-# Access at http://localhost:5001
-
-# Stop when done
-docker compose down
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ mustache-core
 ```
 
-## 📖 Usage Guide
+*(Uma vez publicado no PyPI oficial, o comando simplificado será apenas `pip install mustache-core`)*.
 
-### 1. Upload Dataset
-- Click "Choose File" under **Dataset (CSV)**
-- Select a CSV file with numerical features (no headers)
-- Example format:
+---
+
+## 🚀 Como Usar
+
+### Nome do Pacote vs. Namespace de Importação
+* O pacote é instalado via terminal sob o nome **`mustache-core`**.
+* Para importação em scripts Python ou Notebooks, o namespace correto é **`mustache`** (não `mustache_core`):
+  ```python
+  import mustache
   ```
-  1.2,3.4,5.6
-  2.1,4.3,6.5
-  ...
-  ```
 
-### 2. (Optional) Upload Ground Truth Labels
-- Click "Choose File" under **Ground Truth Labels**
-- Upload CSV file with one label per line
-- This enables validation metrics (ARI, AMI)
+### 💻 Rodando a Interface Web (CLI)
+Após a instalação, a ferramenta registra o comando global `mustache` no seu terminal. Para iniciar a interface:
 
-### 3. Configure Parameters
-- **Min Cluster Size**: Minimum points to form a cluster (default: 5)
-- **Min Samples**: Neighborhood size (default: 5)
-- **Distance Metric**: Choose Euclidean or Manhattan
+```bash
+mustache
+```
 
-### 4. Run Analysis
-- Click **"Run Clustering"**
-- Wait for processing (usually < 5 seconds)
-- Explore interactive visualizations!
+Você também pode personalizar a porta e o endereço de IP do servidor:
+```bash
+mustache --host 127.0.0.1 --port 8080 --debug
+```
 
-### 5. Export Results
-- Click **"Export JSON"** to download full analysis
-- Includes parameters, labels, metrics, and plot data
+Abra seu navegador e acesse: **`http://127.0.0.1:5000`** (ou a porta escolhida).
 
-## 📁 Project Structure
+### 📓 Rodando em Scripts Python / Notebooks
+Se quiser rodar o fluxo de agrupamento de forma programática ou testar sua instalação, crie um script como o exemplo abaixo:
+
+```python
+import pandas as pd
+import numpy as np
+from mustache.core.clustering import run_clustering
+
+# 1. Gerar dados numéricos sintéticos
+np.random.seed(42)
+dados = np.vstack([
+    np.random.normal(loc=0.0, scale=0.5, size=(15, 2)),
+    np.random.normal(loc=5.0, scale=0.5, size=(15, 2))
+])
+df = pd.DataFrame(dados, columns=['x', 'y'])
+
+# 2. Executar o agrupamento utilizando o motor principal Core-SG
+print("Executando agrupamento com Core-SG...")
+resultados = run_clustering(df, min_cluster_size=3, min_samples=3, algorithm='core-sg')
+
+print(f"Sucesso! Grupos encontrados: {resultados['n_clusters']}")
+print(f"Pontos de ruído detectados: {resultados['noise_points']}")
+```
+
+---
+
+## 📁 Estrutura do Repositório
 
 ```
 mustache/
-├── app/                    # Flask application
-│   ├── static/
-│   │   ├── css/           # Stylesheets
-│   │   ├── js/            # JavaScript
-│   │   └── img/           # Logos and images
-│   ├── templates/          # HTML templates
-│   ├── core.py            # Clustering logic
-│   └── routes.py          # API endpoints
-├── datasets/              # Sample datasets
-├── legacy/                # Original codebase (archived)
-├── Dockerfile             # Docker configuration
-├── docker-compose.yml     # Multi-container setup
-├── requirements.txt       # Python dependencies
-├── run.py                 # Flask entry point
-├── run.ps1               # Windows startup script
-└── run.sh                # Linux/Mac startup script
+├── datasets/             # Datasets de exemplo (.csv)
+├── mustache/             # Código-fonte da aplicação
+│   ├── core/             # Algoritmos principais (clustering, HAI, batch, etc.)
+│   ├── static/           # Arquivos estáticos da interface web (CSS, JS, imagens)
+│   ├── templates/        # Templates Flask (HTML)
+│   ├── cli.py            # Script do ponto de entrada CLI
+│   └── routes.py         # Endpoints da API Flask e rotas do Dashboard
+├── pyproject.toml        # Metadados de empacotamento (setuptools)
+├── requirements.txt      # Dependências de desenvolvimento locais
+└── README.md             # Este arquivo de documentação
 ```
 
-## 🔧 Advanced Configuration
+---
 
-### Port Configuration
-Change the port in `docker-compose.yml`:
-```yaml
-ports:
-  - "YOUR_PORT:5000"
-```
+## 🎓 Citação
 
-### Python Dependencies
-Edit `requirements.txt` and rebuild:
-```bash
-docker compose up --build -d
-```
-
-## 🐛 Troubleshooting
-
-### Port Already in Use
-```bash
-# Stop existing container
-docker compose down
-
-# Or change port in docker-compose.yml
-```
-
-### Docker Not Running
-Make sure Docker Desktop is open and running.
-
-### File Upload Errors
-- Ensure CSV files are properly formatted
-- Check that numerical data has no headers
-- Verify file encoding is UTF-8
-
-### Container Rebuild
-If changes don't appear:
-```bash
-docker compose down
-docker compose up --build -d --force-recreate
-```
-
-## 📊 Sample Data
-
-Try the included sample dataset:
-- **Dataset**: `datasets/sample_data.csv` (11 points, 2D)
-- **Labels**: `datasets/sample_labels.csv` (3 clusters)
-
-## 🤝 Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## 📝 Credits
-
-**Original Concept**: Antonio Cavalcante and others (2017)
-
-**Institutions**:
-- Federal University of São Carlos (UFSCar)
-- Newcastle University
-- James Cook University
-
-**Rebuilt by**: Maylon Martins de Melo (2025)
-
-## 📄 License
-
-This project is licensed under the [BSD 3-Clause License](LICENSE).
-
-## 🎓 Citation
-
-If you use MustaCHE in your research, please cite the original paper:
+Se você utilizar o MustaCHE em pesquisas acadêmicas, cite a publicação original dos autores:
 
 ```bibtex
 @article{neto2018mustache,
@@ -208,13 +127,6 @@ If you use MustaCHE in your research, please cite the original paper:
 }
 ```
 
-## 🆘 Support
-
-For issues and questions:
-- Open an issue on GitHub
-- Check the [troubleshooting section](#-troubleshooting)
-
 ---
-
-**Version**: 2.0  
-**Tech Stack**: Flask + Python 3.11 + scikit-learn + Plotly.js + Docker
+**Desenvolvido originalmente por**: Neto et al. (2018)  
+**Reengenharia e Integração com Core-SG por**: Maylon Martins de Melo (Iniciação Científica - UFSCar)
