@@ -26,6 +26,7 @@ mustache = "mustache.cli:main"
 
 [tool.setuptools]
 packages = ["mustache", "mustache.core"]
+include-package-data = true
 
 [tool.setuptools.package-data]
 mustache = ["static/**/*", "templates/**/*"]
