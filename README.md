@@ -23,20 +23,71 @@ In **MustaCHE v2**, the application has been completely re-engineered into a **1
 
 ## 🚀 Quick Start (Running via Python Package)
 
-### 1. Installation via pip
+### Prerequisites
+- **Python >= 3.10** installed.
+- No C++ compilers or Visual Studio required for end users when installing official pre-built wheels (`.whl`) or using the built-in pure-Python fallback.
 
-Once published or installed from PyPI:
+### 1. Create and Activate a Virtual Environment
+
+It is strongly recommended to install the package in an isolated virtual environment:
 
 ```bash
-pip install mustache-core
+# Create virtual environment (.venv)
+python -m venv .venv
 ```
 
-*(If installing from TestPyPI)*:
+Activate the environment based on your operating system and shell:
+
+- **Windows (PowerShell)**:
+  ```powershell
+  .\.venv\Scripts\Activate.ps1
+  ```
+  *(If script execution is disabled, run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` once)*
+- **Windows (Command Prompt / CMD)**:
+  ```cmd
+  .\.venv\Scripts\activate.bat
+  ```
+- **Windows (Git Bash)**:
+  ```bash
+  source .venv/Scripts/activate
+  ```
+- **Linux / macOS (Bash / Zsh)**:
+  ```bash
+  source .venv/bin/activate
+  ```
+
+### 2. Upgrade pip
+
+Ensure `pip` is updated to avoid build or dependency resolution issues:
+
 ```bash
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ mustache-core
+python -m pip install --upgrade pip
 ```
 
-### 2. Launch the Application
+### 3. Install mustache-core
+
+A single `pip install` command installs MustaCHE along with all required dependencies—including the **`core-sg`** clustering engine, Flask, NumPy, Pandas, Scikit-Learn, and Plotly. **End users do not need to install `core-sg` separately.**
+
+- **From PyPI (Official release)**:
+  ```bash
+  pip install mustache-core
+  ```
+
+- **From TestPyPI (Testing / Pre-release)**:
+  ```bash
+  pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ mustache-core
+  ```
+
+> [!TIP]
+> **Automatic Dependency Resolution**: Because `core-sg` is declared in `mustache-core`'s package specifications (`pyproject.toml`), `pip` automatically discovers and installs `core-sg` without any separate commands.
+
+> [!NOTE]
+> The package is named **`mustache-core`** for installation via `pip`, but inside Python scripts and notebooks you import it as:
+> ```python
+> import mustache
+> ```
+
+### 4. Launch the Application
 
 Run the built-in CLI command in your terminal:
 
@@ -47,6 +98,11 @@ mustache
 Custom host and port options:
 ```bash
 mustache --host 127.0.0.1 --port 5000 --debug
+```
+
+*(Alternative command if the global script is not directly resolved in your shell)*:
+```bash
+python -m mustache.cli
 ```
 
 Once started, open your web browser and navigate to:
@@ -73,25 +129,40 @@ If you are developing locally or contributing to the codebase, follow these step
 2. **Create and Activate a Virtual Environment**:
    - **Windows (PowerShell)**:
      ```powershell
-     python -m venv venv
-     .\venv\Scripts\Activate.ps1
+     python -m venv .venv
+     .\.venv\Scripts\Activate.ps1
+     ```
+   - **Windows (Command Prompt / CMD)**:
+     ```cmd
+     .\.venv\Scripts\activate.bat
+     ```
+   - **Windows (Git Bash)**:
+     ```bash
+     source .venv/Scripts/activate
      ```
    - **Linux / macOS**:
      ```bash
-     python3 -m venv venv
-     source venv/bin/activate
+     python3 -m venv .venv
+     source .venv/bin/activate
      ```
 
 3. **Install Dependencies and the Package in Editable Mode**:
    ```bash
-   pip install --upgrade pip
+   python -m pip install --upgrade pip
    pip install -e .
    ```
 
-   *(Optional)* If you are also working on a local version of `core-sg`:
-   ```bash
-   pip install -e ../core-sg
-   ```
+   > [!NOTE]
+   > - Once `core-sg` is published on official PyPI, `pip install -e .` will automatically download and install it.
+   > - If developing both packages simultaneously from source, install your local clone of `core-sg` first:
+   >   ```bash
+   >   pip install -e ../core-sg
+   >   pip install -e .
+   >   ```
+   > - If installing against the TestPyPI repository:
+   >   ```bash
+   >   pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ -e .
+   >   ```
 
 4. **Start the Application**:
    You can run the server via the CLI command:
