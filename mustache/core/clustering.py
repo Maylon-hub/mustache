@@ -51,7 +51,7 @@ def compute_mutual_reachability(data, min_samples, metric='euclidean'):
 
 
 
-def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean', algorithm='core-sg', true_labels=None, precomputed_optics=None):
+def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean', algorithm='core-sg', true_labels=None, precomputed_optics=None, core_model=None, precomputed_projection=None, extra_clustering_time=0.0):
 
     """
     Runs clustering on the provided DataFrame.
@@ -67,19 +67,31 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
 
     t_clustering_start = time.time()
     if algorithm == 'core-sg':
-        # pyrefly: ignore [missing-import]
-        from core_sg import CoreSG
-        clusterer = CoreSG(
-            min_cluster_size=int(min_cluster_size),
-            metric=metric
-        )
-        clusterer.fit(data, m_samples_val)
-        h_obj = clusterer.get_fitted_hdbscan_objects()
-        
-        labels = h_obj['labels_']
-        probabilities = h_obj['probabilities_']
-        
-        Z = h_obj['single_linkage_tree_'].to_numpy().astype(float)
+        if core_model is not None:
+            # Reutiliza o grafo de suporte do Core-SG pré-ajustado em k_max
+            core_model.extract_hierarchy_from_core_sg(k=m_samples_val)
+            labels = np.asarray(core_model.labels_)
+            probabilities = np.asarray(core_model.probabilities_)
+            if hasattr(core_model, 'single_linkage_tree_') and hasattr(core_model.single_linkage_tree_, 'to_numpy'):
+                Z = core_model.single_linkage_tree_.to_numpy().astype(float)
+            elif getattr(core_model, '_single_linkage_tree_array_', None) is not None:
+                Z = np.asarray(core_model._single_linkage_tree_array_, dtype=float)
+            else:
+                h_obj = core_model.get_fitted_hdbscan_objects()
+                Z = h_obj['single_linkage_tree_'].to_numpy().astype(float)
+        else:
+            # pyrefly: ignore [missing-import]
+            from core_sg import CoreSG
+            clusterer = CoreSG(
+                min_cluster_size=int(min_cluster_size),
+                metric=metric
+            )
+            clusterer.fit(data, m_samples_val)
+            h_obj = clusterer.get_fitted_hdbscan_objects()
+            
+            labels = h_obj['labels_']
+            probabilities = h_obj['probabilities_']
+            Z = h_obj['single_linkage_tree_'].to_numpy().astype(float)
         
         import plotly.figure_factory as ff
     else:
@@ -88,6 +100,7 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
             min_cluster_size=int(min_cluster_size),
             min_samples=int(min_samples) if min_samples else None,
             metric=metric,
+            copy=True,
             store_centers='medoid'
         )
 
@@ -104,7 +117,7 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         condensed_mreach = squareform(mreach_matrix, checks=False)
 
         Z = linkage(condensed_mreach, method='single')
-    clustering_time = time.time() - t_clustering_start
+    clustering_time = (time.time() - t_clustering_start) + extra_clustering_time
 
 
     
@@ -212,27 +225,30 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
     )
  
     # Generate 2D Projection (t-SNE)
-    try:
-        from sklearn.manifold import TSNE
-        n_samples = data.shape[0]
-        perplexity = min(30, max(1, n_samples // 3))
-        
-        # Use exact method for tiny datasets to prevent barnes_hut bugs
-        method = 'exact' if n_samples < 50 else 'barnes_hut'
-        
-        # PCA initialization requires at least as many features as n_components (2)
-        init_method = 'random' if data.shape[1] < 2 or n_samples < 2 else 'pca'
-        
-        tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42, method=method, init=init_method)
-        projection = tsne.fit_transform(data)
-    except Exception as e:
-        print(f"Warning: t-SNE projection failed: {e}. Generating fallback projection.")
-        if data.shape[1] >= 2:
-            projection = data[:, :2]
-        elif data.shape[1] == 1:
-            projection = np.column_stack((data[:, 0], np.zeros(data.shape[0])))
-        else:
-            projection = np.zeros((data.shape[0], 2))
+    if precomputed_projection is not None:
+        projection = precomputed_projection
+    else:
+        try:
+            from sklearn.manifold import TSNE
+            n_samples = data.shape[0]
+            perplexity = min(30, max(1, n_samples // 3))
+            
+            # Use exact method for tiny datasets to prevent barnes_hut bugs
+            method = 'exact' if n_samples < 50 else 'barnes_hut'
+            
+            # PCA initialization requires at least as many features as n_components (2)
+            init_method = 'random' if data.shape[1] < 2 or n_samples < 2 else 'pca'
+            
+            tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42, method=method, init=init_method)
+            projection = tsne.fit_transform(data)
+        except Exception as e:
+            print(f"Warning: t-SNE projection failed: {e}. Generating fallback projection.")
+            if data.shape[1] >= 2:
+                projection = data[:, :2]
+            elif data.shape[1] == 1:
+                projection = np.column_stack((data[:, 0], np.zeros(data.shape[0])))
+            else:
+                projection = np.zeros((data.shape[0], 2))
     
     fig_map = go.Figure()
     fig_map.add_trace(go.Scatter(
@@ -282,6 +298,7 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         'metrics': metrics,
         'linkage_z': Z.tolist(),
         'optics_time': round(optics_time, 4),
-        'clustering_time': round(clustering_time, 4)
+        'clustering_time': round(clustering_time, 4),
+        'algorithm': algorithm
     }
 

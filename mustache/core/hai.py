@@ -91,7 +91,7 @@ def run_meta_clustering(hai_matrix):
     np.fill_diagonal(distance_matrix, 0)
     
     # Run HDBSCAN for labels (using sklearn version)
-    clusterer = HDBSCAN(metric='precomputed', min_cluster_size=2, allow_single_cluster=True)
+    clusterer = HDBSCAN(metric='precomputed', min_cluster_size=2, allow_single_cluster=True, copy=True)
     clusterer.fit(distance_matrix)
     labels = clusterer.labels_
     

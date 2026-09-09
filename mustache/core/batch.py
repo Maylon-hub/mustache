@@ -31,7 +31,37 @@ def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algor
     n_iters = max(1, len(range(min_mpts, max_mpts + 1, step)))
     amortized_optics_time = optics_time_total / n_iters
     precomputed_optics = (optics_model.reachability_, optics_model.ordering_, amortized_optics_time)
-    
+
+    # Precompute 2D projection (t-SNE) once for the entire batch to avoid redundant projection calculations
+    precomputed_projection = None
+    try:
+        from sklearn.manifold import TSNE
+        n_samples = data_np.shape[0]
+        perplexity = min(30, max(1, n_samples // 3))
+        method = 'exact' if n_samples < 50 else 'barnes_hut'
+        init_method = 'random' if data_np.shape[1] < 2 or n_samples < 2 else 'pca'
+        tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42, method=method, init=init_method)
+        precomputed_projection = tsne.fit_transform(data_np)
+    except Exception as e:
+        print(f"Warning: Batch t-SNE precomputation failed: {e}")
+
+    # For Core-SG: Build the support graph ONCE up to k_max = max_mpts (ICDE 2022)
+    # Then extract each hierarchy for k <= k_max in milliseconds.
+    core_model = None
+    amortized_core_fit_time = 0.0
+    if algorithm == 'core-sg':
+        try:
+            from core_sg import CoreSG
+            t_core_start = time.time()
+            core_model = CoreSG(metric=metric)
+            core_model.fit(data_np, k_max=int(max_mpts))
+            core_fit_time = time.time() - t_core_start
+            amortized_core_fit_time = core_fit_time / n_iters
+        except Exception as e:
+            print(f"Warning: Failed to pre-fit CoreSG graph in batch: {e}. Falling back to standard execution.")
+            core_model = None
+            amortized_core_fit_time = 0.0
+
     # Loop through mpts range
     for mpts in range(min_mpts, max_mpts + 1, step):
         # We use mpts for both min_cluster_size and min_samples mimicking legacy behavior
@@ -45,7 +75,10 @@ def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algor
                 min_samples=mpts, 
                 metric=metric, 
                 algorithm=algorithm,
-                precomputed_optics=precomputed_optics
+                precomputed_optics=precomputed_optics,
+                core_model=core_model,
+                precomputed_projection=precomputed_projection,
+                extra_clustering_time=amortized_core_fit_time
             )
             results[str(mpts)] = cluster_result
         except Exception as e:
@@ -173,11 +206,18 @@ def analyze_batch_results(batch_results):
         medoids_mpts[int(label)] = int(sorted_keys[idx])
     medoids_time = time.time() - t_medoids_start
     
+    # Identify algorithm used in batch
+    algo_used = "HDBSCAN/Core-SG"
+    for res in batch_results.values():
+        if isinstance(res, dict) and 'algorithm' in res:
+            algo_used = "Core-SG" if res['algorithm'] == 'core-sg' else "HDBSCAN"
+            break
+
     # Format and display execution times report in the CLI
     print("\n" + "="*50)
     print("           MUSTACHE V2 TIMING PROFILE REPORT")
     print("="*50)
-    print(f"1. Core Clustering Runs Time (HDBSCAN/Core-SG): {total_clustering_time:.4f}s")
+    print(f"1. Core Clustering Runs Time ({algo_used}): {total_clustering_time:.4f}s")
     print(f"2. Reachability Plots Runs Time (OPTICS):      {total_optics_time:.4f}s")
     print(f"3. HAI Similarity Matrix Computation Time:      {hai_time:.4f}s")
     print(f"4. Meta-Clustering & Dendrogram Build Time:    {dendrogram_time:.4f}s")

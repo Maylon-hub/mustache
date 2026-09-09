@@ -42,7 +42,13 @@ Activate the environment based on your operating system and shell:
   ```powershell
   .\.venv\Scripts\Activate.ps1
   ```
-  *(If script execution is disabled, run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` once)*
+  > [!TIP]
+  > **PowerShell Script Execution Error (`PSSecurityException`)?**  
+  > If Windows blocks the script execution, run this command **once** in PowerShell to allow virtual environment scripts for your current user:
+  > ```powershell
+  > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+  > ```
+  > Press `Y` (or `S`) when prompted, then re-run `.\.venv\Scripts\Activate.ps1`.
 - **Windows (Command Prompt / CMD)**:
   ```cmd
   .\.venv\Scripts\activate.bat
@@ -132,6 +138,7 @@ If you are developing locally or contributing to the codebase, follow these step
      python -m venv .venv
      .\.venv\Scripts\Activate.ps1
      ```
+     *(If script execution is blocked, run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` once)*
    - **Windows (Command Prompt / CMD)**:
      ```cmd
      .\.venv\Scripts\activate.bat

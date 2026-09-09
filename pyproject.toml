@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mustache-core"
-version = "0.1.0"
+version = "0.1.1"
 description = "MustaCHE (Multiple Cluster Hierarchies Explorer) integrated with Core-SG"
 authors = [
     {name = "MustaCHE Authors", email = "authors@example.com"}
@@ -13,7 +13,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "Flask>=3.0.0",
-    "core-sg",
+    "core-sg-mustache>=0.2.0rc1",
     "numpy",
     "pandas",
     "scikit-learn",
@@ -30,3 +30,13 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 mustache = ["static/**/*", "templates/**/*"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-flask>=1.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

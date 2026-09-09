@@ -31,6 +31,7 @@
                 <ul>
                     <li><a href="#" onclick="openBatchConfigModal(); return false;"><i class="fas fa-chart-pie"></i>
                             Datasets</a></li>
+                    <li><a href="/projects"><i class="fas fa-folder-open"></i> Projects &amp; History</a></li>
                     <li><a href="#" onclick="return false;"><i class="fas fa-cog"></i> Global Settings</a></li>
                 </ul>
 
@@ -51,6 +52,12 @@
                 <div class="value" id="proj-min-mpts">-</div>
                 <div class="label">Time:</div>
                 <div class="value" id="proj-time">-</div>
+                <button id="btn-sidebar-save"
+                    class="btn btn-sm btn-outline-success w-100 mt-2"
+                    style="display:none; font-size:0.75rem;"
+                    onclick="openSaveProjectModal()">
+                    <i class="fas fa-save mr-1"></i> Save Analysis
+                </button>
             </div>
 
             <div class="sidebar-footer" style="padding-bottom: 10px;">
@@ -91,6 +98,7 @@
                             <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
                         </div>
                     </div>
+                    <a href="/projects" title="Projects &amp; History" style="color: #95a5a6; font-size: 1.2rem; margin-right: 15px;"><i class="fas fa-folder-open"></i></a>
                     <a href="#" title="Settings" style="color: #95a5a6; font-size: 1.2rem; margin-right: 15px;"><i
                             class="fas fa-cog"></i></a>
                     <a href="#" title="About" onclick="openAboutModal(); return false;"
