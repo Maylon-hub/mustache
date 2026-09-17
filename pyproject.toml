@@ -39,4 +39,5 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --tb=short"
+python_files = ["test_clustering.py", "test_batch.py", "test_hai.py", "test_api_routes.py"]
+addopts = "-v --tb=short -p no:flask"

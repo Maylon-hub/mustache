@@ -20,6 +20,13 @@ SESSION_DATA = {
 
 @main.route('/')
 def index():
+    if request.args.get('new') == '1':
+        SESSION_DATA.clear()
+        SESSION_DATA.update({
+            'meta_linkage': None,
+            'hai_matrix': None,
+            'ordered_mpts': None
+        })
     project_id = request.args.get('project_id', '')
     return render_template('index.html', project_id=project_id)
 

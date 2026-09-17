@@ -258,9 +258,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Close Modal
                 $('#batchConfigModal').modal('hide');
 
-                // Reveal sidebar Save button
+                // Reveal sidebar and top Save buttons
                 const sidebarSaveBtn = document.getElementById('btn-sidebar-save');
                 if (sidebarSaveBtn) sidebarSaveBtn.style.display = 'inline-block';
+                const topSaveBtn = document.getElementById('btn-save-top');
+                if (topSaveBtn) topSaveBtn.style.display = 'inline-block';
 
                 // 1. Render Meta-Dendrogram
                 if (latestAnalysis.meta_dendrogram_json) {
@@ -513,6 +515,12 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedBranches.clear();
         currentMedoidsSignature = '';
         updateSelectedBranchesBadge();
+
+        // Reveal top and sidebar Save buttons
+        const topSaveBtn = document.getElementById('btn-save-top');
+        if (topSaveBtn) topSaveBtn.style.display = 'inline-block';
+        const sidebarSaveBtn = document.getElementById('btn-sidebar-save');
+        if (sidebarSaveBtn) sidebarSaveBtn.style.display = 'inline-block';
 
         // Render Meta-Dendrogram from saved JSON
         if (analysis.meta_dendrogram_json) {

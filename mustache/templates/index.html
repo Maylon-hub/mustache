@@ -34,6 +34,9 @@
                 <span id="selected-branches-badge" class="badge badge-info my-1 ml-1" style="display:none;">0 branches selected</span>
             </div>
             <div class="d-flex align-items-center my-1">
+                <button id="btn-save-top" class="btn btn-sm btn-outline-success mr-2" style="display:none;" onclick="openSaveProjectModal()" title="Save Analysis to History">
+                    <i class="fas fa-save mr-1"></i> Save Analysis
+                </button>
                 <button id="btn-export-csv" class="btn btn-sm btn-outline-success mr-2" onclick="exportSelectedBranchesCSV()" title="Export Cluster Labels as CSV">
                     <i class="fas fa-download"></i> Export CSV
                 </button>
@@ -166,9 +169,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (projName) projName.innerText = meta.name || 'Loaded Project';
         if (projTime) projTime.innerText = meta.mpts_min || '-';
 
-        // Reveal save button
+        // Reveal save buttons
         const sidebarSaveBtn = document.getElementById('btn-sidebar-save');
         if (sidebarSaveBtn) sidebarSaveBtn.style.display = 'inline-block';
+        const topSaveBtn = document.getElementById('btn-save-top');
+        if (topSaveBtn) topSaveBtn.style.display = 'inline-block';
 
     } catch (err) {
         console.error('Failed to load project:', err);
