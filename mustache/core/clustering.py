@@ -95,13 +95,13 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         
         import plotly.figure_factory as ff
     else:
-        from sklearn.cluster import HDBSCAN
-        clusterer = HDBSCAN(
+        import hdbscan
+        clusterer = hdbscan.HDBSCAN(
             min_cluster_size=int(min_cluster_size),
             min_samples=int(min_samples) if min_samples else None,
             metric=metric,
-            copy=True,
-            store_centers='medoid'
+            match_reference_implementation=True,
+            core_dist_n_jobs=1,
         )
 
         labels = clusterer.fit_predict(data)
