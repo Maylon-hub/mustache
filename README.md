@@ -1,21 +1,27 @@
 # MustaCHE (Multiple Cluster Hierarchies Explorer)
 
+![TestPyPI Version](https://img.shields.io/badge/TestPyPI-mustache--core%20v0.2.0-blue)
+![Backend Version](https://img.shields.io/badge/backend-core--sg--mustache%20v0.3.0-green)
+![Python Version](https://img.shields.io/badge/python-3.11-blue)
+![Platform](https://img.shields.io/badge/platform-win__amd64-lightgrey)
+
 **MustaCHE** is an interactive web-based visual analytics tool for exploring hierarchical density-based clustering. It enables users to analyze multiple clustering hierarchies generated across a wide range of density parameters ($m_{pts}$) simultaneously, offering deep insights into cluster stability, hierarchy relationships, and data partitioning.
 
-In **MustaCHE v2**, the application has been completely re-engineered into a **100% native Python package** (`mustache-core`), removing all legacy Java and Docker dependencies. It integrates the state-of-the-art **Core-SG (Core Structure Graph)** engine for ultra-fast Minimum Spanning Tree (MST) computation and includes a built-in Command Line Interface (CLI).
+In **MustaCHE v2**, the application has been completely re-engineered into a **100% native Python package** (`mustache-core`), removing all legacy Java and Docker dependencies. It integrates the state-of-the-art **Core-SG (Core Structure Graph)** engine with Cython acceleration (`core-sg-mustache`) for ultra-fast Minimum Spanning Tree (MST) computation and includes a built-in Command Line Interface (CLI).
 
 ---
 
 ## 🌟 Key Features
 
 - **100% Native Python**: No Docker or Java required. Install and run directly via Python/pip.
-- **Core-SG & HDBSCAN Integration**: Accelerated density-based clustering powered by `core-sg` for scalable multiple MST extractions.
-- **Optimized Reachability Plots**: Built-in OPTICS caching mechanism speeding up reachability rendering by up to **~11x (91% faster)** during batch processing.
-- **Interactive Visualizations (Plotly.js)**:
+- **Core-SG & HDBSCAN Integration**: Accelerated density-based clustering powered by `core-sg-mustache` for scalable multiple MST extractions.
+- **Pre-compiled Wheels**: Windows 64-bit pre-compiled binaries available on TestPyPI—no C++ compiler or Visual Studio required for installation.
+- **Optimized Reachability Plots**: Built-in OPTICS caching mechanism speeding up reachability rendering during batch processing.
+- **Interactive Visualizations (Plotly.js & D3.js)**:
   - **Meta-Clustering Dendrogram**: Hierarchically cluster different parameter configurations with dynamic cut thresholding.
   - **HAI Similarity Matrix**: Visualizes structural agreement between clustering partitions across parameter ranges.
   - **Reachability Plot**: Highlights density valleys corresponding to physical clusters.
-  - **2D Projection Scatter Map**: Spatial projection powered by t-SNE.
+  - **2D Projection Scatter Map**: Spatial projection powered by t-SNE / UMAP.
 - **CLI & Web Dashboard**: Run with a single command (`mustache`) or import functions directly into Python scripts and Jupyter Notebooks.
 - **Ground Truth Validation**: Support for external label files to calculate Adjusted Rand Index (ARI) and Adjusted Mutual Information (AMI).
 
@@ -24,8 +30,9 @@ In **MustaCHE v2**, the application has been completely re-engineered into a **1
 ## 🚀 Quick Start (Running via Python Package)
 
 ### Prerequisites
-- **Python >= 3.10** installed.
-- No C++ compilers or Visual Studio required for end users when installing official pre-built wheels (`.whl`) or using the built-in pure-Python fallback.
+
+- **Python 3.11.0 (64-bit)** recommended for using pre-built wheels.
+- No C++ compilers or Visual Studio required for end users on Windows 64-bit when installing official pre-built wheels (`.whl`).
 
 ### 1. Create and Activate a Virtual Environment
 
@@ -72,20 +79,18 @@ python -m pip install --upgrade pip
 
 ### 3. Install mustache-core
 
-A single `pip install` command installs MustaCHE along with all required dependencies—including the **`core-sg`** clustering engine, Flask, NumPy, Pandas, Scikit-Learn, and Plotly. **End users do not need to install `core-sg` separately.**
+A single `pip install` command installs MustaCHE along with all required dependencies—including the **`core-sg-mustache`** backend engine, Flask, NumPy, Pandas, Scikit-Learn, Scipy, HDBSCAN, and Plotly. **End users do not need to install `core-sg-mustache` separately.**
+
+- **From TestPyPI (Current release v0.2.0)**:
+  ```bash
+  pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ mustache-core==0.2.0
+  ```
 
 - **From PyPI (Official release)**:
-  ```bash
-  pip install mustache-core
-  ```
-
-- **From TestPyPI (Testing / Pre-release)**:
-  ```bash
-  pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ mustache-core
-  ```
+  *Coming soon*
 
 > [!TIP]
-> **Automatic Dependency Resolution**: Because `core-sg` is declared in `mustache-core`'s package specifications (`pyproject.toml`), `pip` automatically discovers and installs `core-sg` without any separate commands.
+> **Automatic Dependency Resolution**: Because `core-sg-mustache` is declared in `mustache-core`'s package specifications (`pyproject.toml`), `pip` automatically discovers and installs `core-sg-mustache` without any separate commands.
 
 > [!NOTE]
 > The package is named **`mustache-core`** for installation via `pip`, but inside Python scripts and notebooks you import it as:
@@ -121,7 +126,8 @@ Once started, open your web browser and navigate to:
 If you are developing locally or contributing to the codebase, follow these steps to run MustaCHE directly from source without Docker.
 
 ### Prerequisites
-- **Python >= 3.10** (Python 3.11 or 3.12 recommended)
+
+- **Python 3.11.0 (64-bit)**
 - **Git**
 
 ### Step-by-Step Guide
@@ -156,19 +162,14 @@ If you are developing locally or contributing to the codebase, follow these step
 3. **Install Dependencies and the Package in Editable Mode**:
    ```bash
    python -m pip install --upgrade pip
-   pip install -e .
+   pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ -e .
    ```
 
    > [!NOTE]
-   > - Once `core-sg` is published on official PyPI, `pip install -e .` will automatically download and install it.
-   > - If developing both packages simultaneously from source, install your local clone of `core-sg` first:
+   > - If developing both packages simultaneously from source, build and install your local clone of `core-sg-mustache` first:
    >   ```bash
    >   pip install -e ../core-sg
    >   pip install -e .
-   >   ```
-   > - If installing against the TestPyPI repository:
-   >   ```bash
-   >   pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ -e .
    >   ```
 
 4. **Start the Application**:
@@ -182,11 +183,6 @@ If you are developing locally or contributing to the codebase, follow these step
    python -m mustache.cli
    ```
 
-   Or execute the script directly:
-   ```bash
-   python mustache/cli.py
-   ```
-
 5. **Open the Dashboard**:
    Open your browser at **`http://127.0.0.1:5000`**.
 
@@ -194,14 +190,14 @@ If you are developing locally or contributing to the codebase, follow these step
 
 ## 🐍 Using MustaCHE as a Python Library
 
-You can also import MustaCHE algorithms directly into your Python scripts or Jupyter Notebooks:
+You can import MustaCHE algorithms directly into your Python scripts or Jupyter Notebooks:
 
 ```python
 import pandas as pd
-from mustache.core.clustering import run_clustering
+from mustache.core import run_clustering
 from mustache.core.batch import run_batch_clustering
 
-# Load numerical dataset (without headers)
+# Load numerical dataset
 df = pd.read_csv("datasets/sample_data.csv", header=None)
 
 # 1. Run single clustering analysis
@@ -210,7 +206,7 @@ result = run_clustering(
     min_cluster_size=5, 
     min_samples=5, 
     metric="euclidean", 
-    algorithm="core-sg"  # or 'standard'
+    algorithm="core-sg"  # Options: 'core-sg' or 'hdbscan'
 )
 print(f"Number of clusters found: {result['n_clusters']}")
 
@@ -231,13 +227,7 @@ print(f"Processed {len(batch_results['results'])} hierarchies.")
 ## 📖 Usage Guide
 
 ### 1. Upload Dataset
-- Under the **Dataset (CSV)** section, upload a CSV file containing numerical feature values (comma-separated, without header row).
-- Example format:
-  ```csv
-  1.2,3.4,5.6
-  2.1,4.3,6.5
-  0.8,3.1,4.9
-  ```
+- Under the **Dataset (CSV)** section, upload a CSV file containing numerical feature values (comma-separated).
 
 ### 2. (Optional) Ground Truth Labels
 - Upload a single-column CSV containing integer cluster labels to calculate ARI and AMI validation metrics.
@@ -246,7 +236,7 @@ print(f"Processed {len(batch_results['results'])} hierarchies.")
 - **Min Cluster Size**: Smallest grouping considered a valid cluster.
 - **Min Samples**: Density threshold / neighborhood size.
 - **Distance Metric**: `Euclidean` or `Manhattan`.
-- **Algorithm**: `core-sg` (recommended for faster MST computation) or `standard` (scikit-learn HDBSCAN).
+- **Algorithm**: `core-sg` (recommended for fast Cython MST computation) or `hdbscan` (standalone reference HDBSCAN).
 
 ### 4. Batch Analysis
 - In the **Batch Analysis** section, define a range of $m_{pts}$ values (`Min`, `Max`, `Step`).
@@ -262,11 +252,15 @@ print(f"Processed {len(batch_results['results'])} hierarchies.")
 ```
 mustache/
 ├── datasets/                 # Sample datasets for testing (CSV format)
+├── docs/                     # Detailed documentation & reproducibility guides
+│   ├── guia_documentacao.md  # API reference & user guide
+│   └── reproducao.md         # Reproducibility manual
 ├── mustache/                 # Main Python package
 │   ├── __init__.py           # Flask application factory
 │   ├── cli.py                # Command Line Interface (CLI) entrypoint
 │   ├── routes.py             # Flask HTTP routes and API endpoints
 │   ├── core/                 # Core clustering algorithms and logic
+│   │   ├── __init__.py       # Core module exports
 │   │   ├── clustering.py     # HDBSCAN & Core-SG clustering runner
 │   │   ├── batch.py          # Batch parameter exploration & caching
 │   │   └── hai.py            # Hierarchy Agreement Index calculation
@@ -284,25 +278,5 @@ mustache/
 
 - **Original MustaCHE Concept & Authors**:
   Antonio Cavalcante Araujo Neto, Mario A. Nascimento, Joerg Sander, and Ricardo J. G. B. Campello (2018).
-- **Modernization & Core-SG Integration**:
+- **Modernization, Core-SG Integration & Cython Backend**:
   Maylon Martins de Melo (2025-2026), Federal University of São Carlos (UFSCar).
-- **License**: [BSD 3-Clause License](LICENSE).
-
----
-
-## 🎓 Citation
-
-If you use MustaCHE in your research, please cite the original publication:
-
-```bibtex
-@article{neto2018mustache,
-  title={MustaCHE: A Multiple Clustering Hierarchies Explorer},
-  author={Neto, Antonio Cavalcante Araujo and Nascimento, Mario A and Sander, Joerg and Campello, Ricardo JGB},
-  journal={Proceedings of the VLDB Endowment},
-  volume={11},
-  number={12},
-  pages={2058--2061},
-  year={2018},
-  publisher={VLDB Endowment}
-}
-```

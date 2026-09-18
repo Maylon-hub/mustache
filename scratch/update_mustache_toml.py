@@ -1,4 +1,7 @@
-[build-system]
+﻿from pathlib import Path
+
+p = Path(r'C:\Users\guest\Documents\GitHub\mustache\pyproject.toml')
+new_toml = '''[build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
@@ -47,3 +50,7 @@ dev = [
 testpaths = ["tests"]
 python_files = ["test_clustering.py", "test_batch.py", "test_hai.py", "test_api_routes.py"]
 addopts = "-v --tb=short -p no:flask"
+'''
+
+p.write_text(new_toml, encoding='utf-8')
+print("Successfully updated mustache pyproject.toml!")
