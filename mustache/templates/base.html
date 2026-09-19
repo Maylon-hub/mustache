@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MustaCHE v2</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/LOGO.png') }}">
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <!-- Bootstrap CSS for Grid/Modals (using CDN for simplicity in replication) -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <div id="wrapper">
+        <!-- Fixed Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header"
+                style="background:var(--sidebar-bg); border-bottom: none; display: flex; align-items: center; gap: 10px;">
+                <img src="{{ url_for('static', filename='img/Mustache_Logo_SVG.svg') }}" alt="MustaCHE Logo"
+                    style="height: 30px; filter: brightness(0) invert(1);">
+                <h3 style="color:#fff; margin: 0;"><span style="color:var(--primary-green);">Musta</span>CHE</h3>
+            </div>
+
+            <div class="sidebar-nav">
+                <!-- Main Section -->
+                <div class="sidebar-section-title">Main</div>
+                <ul>
+                    <li><a href="#" onclick="openBatchConfigModal(); return false;"><i class="fas fa-chart-pie"></i>
+                            Datasets</a></li>
+                    ed <li><a href="/projects"><i class="fas fa-folder-open"></i> Projects &amp; History</a></li>
+                    <li><a href="#" onclick="return false;"><i class="fas fa-cog"></i> Global Settings</a></li>
+                </ul>
+
+                <!-- Panels Section -->
+                <div class="sidebar-section-title">Panels</div>
+                <ul>
+                    <li><a href="#"><i class="fas fa-sitemap"></i> Dendrogram</a></li>
+                    <li><a href="#"><i class="fas fa-th"></i> HAI Plot</a></li>
+                    <li><a href="#"><i class="fas fa-chart-area"></i> Reachability</a></li>
+                </ul>
+            </div>
+
+            <div class="project-info-panel">
+                <div class="sidebar-section-title" style="padding:0; margin-bottom:10px;">Project</div>
+                <div class="label">Name:</div>
+                <div class="value" id="proj-name">Unknown</div>
+                <div class="label">Min mpts:</div>
+                <div class="value" id="proj-min-mpts">-</div>
+                <div class="label">Time:</div>
+                <div class="value" id="proj-time">-</div>
+                <button id="btn-sidebar-save" class="btn btn-sm btn-outline-success w-100 mt-2"
+                    style="display:none; font-size:0.75rem;" onclick="openSaveProjectModal()">
+                    <i class="fas fa-save mr-1"></i> Save Analysis
+                </button>
+            </div>
+
+            <div class="sidebar-footer" style="padding-bottom: 10px;">
+                <div class="project-info" style="font-size:0.75rem; margin-bottom:5px;">Project by:</div>
+                <div class="logos"
+                    style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; align-items:center; padding: 0 5px;">
+                    <img src="{{ url_for('static', filename='img/ufscar-logo.png') }}" alt="UFSCar" title="UFSCar"
+                        style="max-width: 100%; max-height: 25px; object-fit: contain;">
+                    <img src="{{ url_for('static', filename='img/newcastle-logo.png') }}" alt="Newcastle"
+                        title="Newcastle University" style="max-width: 100%; max-height: 25px; object-fit: contain;">
+                    <img src="{{ url_for('static', filename='img/UA-EAC-COLOUR-REVERSE.svg') }}"
+                        alt="University of Alberta" title="University of Alberta"
+                        style="max-width: 100%; max-height: 25px; object-fit: contain;">
+                    <img src="{{ url_for('static', filename='img/jcu-logo.png') }}" alt="JCU"
+                        title="James Cook University" style="max-width: 100%; max-height: 25px; object-fit: contain;">
+                </div>
+                <div class="copyright" style="font-size:0.7rem; margin-top:5px; text-align:center;">&copy; 2017 The
+                    Develovers</div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="main">
+            <!-- Top Navbar matches overview.png -->
+            <div class="top-navbar"
+                style="justify-content: space-between; background: #fff; border-bottom: 2px solid #2ecc71;">
+                <div class="brand d-flex align-items-center">
+                    <!-- Nav Logo -->
+                    <i class="fas fa-bars"
+                        style="font-size: 1.2rem; color: #95a5a6; margin-right: 15px; cursor: pointer;"></i>
+                    <img src="{{ url_for('static', filename='img/LOGO.png') }}" alt="MustaCHE Logo"
+                        style="height: 35px;">
+                </div>
+                <div class="navbar-right d-flex align-items-center">
+                    <div class="input-group input-group-sm" style="width: 250px; margin-right: 15px;">
+                        <input type="text" class="form-control" placeholder="Search datasets...">
+                        <div class="input-group-append">
+                            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                        </div>
+                    </div>
+                    <a href="/projects" title="Projects &amp; History"
+                        style="color: #95a5a6; font-size: 1.2rem; margin-right: 15px;"><i
+                            class="fas fa-folder-open"></i></a>
+                    <a href="#" title="Settings" style="color: #95a5a6; font-size: 1.2rem; margin-right: 15px;"><i
+                            class="fas fa-cog"></i></a>
+                    <a href="#" title="About" onclick="openAboutModal(); return false;"
+                        style="color: #95a5a6; font-size: 1.2rem;"><i class="fas fa-info-circle"></i></a>
+                </div>
+            </div>
+
+            <!-- Scrollable Content -->
+            <div class="main-content-scroll">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="aboutModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeAboutModal()">&times;</span>
+            <h2>About MustaCHE v2</h2>
+            <p><strong>MustaCHE</strong> (Multiple Cluster Hierarchies Explorer) is a tool for analyzing hierarchical
+                density-based clustering results.</p>
+            <h3>Version Information</h3>
+            <p>Version: 2.0 (Rebuilt)</p>
+            <p>Technology Stack: Flask + Python 3.11 + scikit-learn + Plotly.js</p>
+            <h3>Credits</h3>
+            <p>Origin: Antonio Cavalcante et al. (2017)</p>
+            <p>Rebuilt: Maylon Martins de Melo (2025)</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <!-- jQuery and Bootstrap JS for Modals -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=2.0.2"></script>
+
+    <script>
+        // Modal Logic
+        function openAboutModal() {
+            document.getElementById('aboutModal').style.display = "block";
+        }
+        function closeAboutModal() {
+            document.getElementById('aboutModal').style.display = "none";
+        }
+
+        // Config Modal will be defined in dashboard.html or main.js
+        function openConfigModal() {
+            if (document.getElementById('configModal')) {
+                $('#configModal').modal('show');
+            } else {
+                alert("Configuration is available on the Dashboard page.");
+            }
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function (event) {
+            var modal = document.getElementById('aboutModal');
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+    </script>
+</body>
+
+</html>

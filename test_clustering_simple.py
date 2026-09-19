@@ -1,10 +1,11 @@
 import pandas as pd
+# pyrefly: ignore [missing-import]
 import numpy as np
 import sys
 import os
 
 sys.path.append(os.getcwd())
-from app.core.clustering import run_clustering
+from mustache.core.clustering import run_clustering
 
 print("Testing simple clustering...")
 df = pd.DataFrame([[1,1], [1,2], [10,10], [10,11]], columns=['x', 'y'])

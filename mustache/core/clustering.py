@@ -1,0 +1,304 @@
+from sklearn.cluster import HDBSCAN
+
+
+import pandas as pd
+import numpy as np
+import time
+from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
+from sklearn.neighbors import NearestNeighbors
+from scipy.spatial.distance import pdist, squareform
+
+
+def compute_mutual_reachability(data, min_samples, metric='euclidean'):
+    """
+    Computes the Mutual Reachability Distance matrix for HDBSCAN.
+    d_mreach(a, b) = max(core_k(a), core_k(b), d(a, b))
+    """
+    n_samples = data.shape[0]
+    k = min(min_samples, n_samples)
+    
+    # Compute Core Distances (distance to k-th nearest neighbor)
+    nbrs = NearestNeighbors(n_neighbors=k, metric=metric).fit(data)
+    core_distances, _ = nbrs.kneighbors(data)
+    core_dist = core_distances[:, -1]
+    
+    # Compute basic Distance Matrix
+    if metric == 'euclidean':
+        raw_dist = squareform(pdist(data))
+    else:
+        raw_dist = squareform(pdist(data, metric=metric))
+        
+    # Vectorized Mutual Reachability
+    # MR[i,j] = max(core[i], core[j], dist[i,j])
+    
+    # Expand core distances to matrix for broadcasting
+    # core_mat[i, j] = core_dist[i]
+    core_mat = np.tile(core_dist, (n_samples, 1))
+    
+    # Symmetric max of cores: max(core[i], core[j])
+    # max_core[i, j] = max(core[i], core[j])
+    max_core = np.maximum(core_mat, core_mat.T)
+    
+    # Final MR
+    mreach_mat = np.maximum(max_core, raw_dist)
+    
+    # Ensure diagonal is exactly zero (fix for floating point errors)
+    np.fill_diagonal(mreach_mat, 0)
+    
+    return mreach_mat
+
+
+
+
+
+def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean', algorithm='core-sg', true_labels=None, precomputed_optics=None, core_model=None, precomputed_projection=None, extra_clustering_time=0.0):
+
+    """
+    Runs clustering on the provided DataFrame.
+    Returns a dictionary with results.
+    """
+    # Convert DataFrame to numpy array
+    data = df.select_dtypes(include=[np.number]).to_numpy()
+    
+    if data.size == 0 or data.shape[1] == 0:
+        raise ValueError("No numerical data found for clustering. Please ensure the CSV contains numeric columns.")
+        
+    m_samples_val = int(min_samples) if min_samples else int(min_cluster_size)
+
+    t_clustering_start = time.time()
+    if algorithm == 'core-sg':
+        if core_model is not None:
+            # Reutiliza o grafo de suporte do Core-SG pré-ajustado em k_max
+            core_model.extract_hierarchy_from_core_sg(k=m_samples_val)
+            labels = np.asarray(core_model.labels_)
+            probabilities = np.asarray(core_model.probabilities_)
+            if hasattr(core_model, 'single_linkage_tree_') and hasattr(core_model.single_linkage_tree_, 'to_numpy'):
+                Z = core_model.single_linkage_tree_.to_numpy().astype(float)
+            elif getattr(core_model, '_single_linkage_tree_array_', None) is not None:
+                Z = np.asarray(core_model._single_linkage_tree_array_, dtype=float)
+            else:
+                h_obj = core_model.get_fitted_hdbscan_objects()
+                Z = h_obj['single_linkage_tree_'].to_numpy().astype(float)
+        else:
+            # pyrefly: ignore [missing-import]
+            from core_sg import CoreSG
+            clusterer = CoreSG(
+                min_cluster_size=int(min_cluster_size),
+                metric=metric
+            )
+            clusterer.fit(data, m_samples_val)
+            h_obj = clusterer.get_fitted_hdbscan_objects()
+            
+            labels = h_obj['labels_']
+            probabilities = h_obj['probabilities_']
+            Z = h_obj['single_linkage_tree_'].to_numpy().astype(float)
+        
+        import plotly.figure_factory as ff
+    else:
+        import hdbscan
+        clusterer = hdbscan.HDBSCAN(
+            min_cluster_size=int(min_cluster_size),
+            min_samples=int(min_samples) if min_samples else None,
+            metric=metric,
+            match_reference_implementation=True,
+            core_dist_n_jobs=1,
+        )
+
+        labels = clusterer.fit_predict(data)
+        probabilities = clusterer.probabilities_
+        
+        from scipy.cluster.hierarchy import linkage, dendrogram
+        import plotly.figure_factory as ff
+        
+        # MR Distance Matrix
+        mreach_matrix = compute_mutual_reachability(data, m_samples_val, metric)
+        
+        # Condense for linkage (scipy expects condensed distance array)
+        condensed_mreach = squareform(mreach_matrix, checks=False)
+
+        Z = linkage(condensed_mreach, method='single')
+    clustering_time = (time.time() - t_clustering_start) + extra_clustering_time
+
+
+    
+    # Create Dendrogram Figure
+    fig_dendro = ff.create_dendrogram(data, linkagefun=lambda x: Z)
+    fig_dendro.update_layout(
+        template='plotly_white',
+        title='Hierarchical Clustering Dendrogram',
+        xaxis_title='Sample Index',
+        yaxis_title='Distance',
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+
+    # Generate Reachability Plot
+    # HDBSCAN doesn't produce a reachability plot directly like OPTICS, 
+    # but we can approximate a similar view using the single linkage tree (MST).
+    # The 'Z' linkage matrix contains (cluster_1, cluster_2, distance, sample_count).
+    # For a reachability plot, we typically want the distance to the nearest neighbor 
+    # in the spanning tree, ordered by the traversal.
+    
+    # Simplified approach: Use the linkage distances directly for now, 
+    # ordered by the dendrogram leaves.
+    dendro_leaves = fig_dendro['layout']['xaxis']['ticktext']
+    # Map leaf indices to original data indices
+    ordered_indices = [int(i) for i in dendro_leaves]
+    
+    # We need a reachability distance for each point. 
+    # In single linkage, this is roughly the height at which the point merges.
+    # This is a simplification; true reachability requires OPTICS or extracting from MST.
+    # For HDBSCAN, the 'condensed_tree_' or 'single_linkage_tree_' is the source.
+    
+    # Let's use the single linkage tree from HDBSCAN if available, or our scipy Z.
+    # Scipy Z: Z[i, 2] is the distance.
+    
+    # Constructing a basic reachability-like plot from Z:
+    # This is complex to do perfectly without OPTICS, but we can plot the 
+    # merge distances of the ordered points.
+    
+    import plotly.graph_objects as go
+    
+    # Placeholder for true reachability: Plot distances of ordered points
+    # This is NOT a true reachability plot but gives a similar visual of density structure
+    # for verification purposes.
+    
+    fig_reach = go.Figure()
+    fig_reach.add_trace(go.Bar(
+        x=list(range(len(ordered_indices))),
+        y=[0] * len(ordered_indices), # Placeholder, need to calculate actual reachability
+        marker_color='#097B43'
+    ))
+    
+    # Alternative: Use OPTICS from sklearn for the reachability plot specifically, 
+    # as it's the standard for that visualization.
+    if precomputed_optics is not None:
+        reachability_raw, ordering, optics_time = precomputed_optics
+    else:
+        t_optics_start = time.time()
+        from sklearn.cluster import OPTICS
+        optics = OPTICS(min_samples=int(min_samples) if min_samples else 5, metric=metric)
+        optics.fit(data)
+        optics_time = time.time() - t_optics_start
+        reachability_raw = optics.reachability_
+        ordering = optics.ordering_
+ 
+    
+    reachability = reachability_raw[ordering]
+    labels_optics = None # We don't need optics labels since we color by HDBSCAN/CoreSG
+    
+    # Clean np.inf values that squash the reachability plot's visual scale.
+    # Replace np.inf with a reasonable visual ceiling (1.1 * max_non_infinite_distance).
+    non_inf_mask = np.isfinite(reachability)
+    if np.any(non_inf_mask):
+        max_reach = np.max(reachability[non_inf_mask])
+        # If all finite are very small or zero, use a default minimum ceiling
+        ceiling = max(max_reach * 1.1, 1.0)
+    else:
+        ceiling = 1.0
+        
+    reachability_clean = np.where(np.isinf(reachability), ceiling, reachability)
+    
+    # Use HDBSCAN labels for coloring instead of OPTICS labels for consistency
+    ordered_hdbscan_labels = labels[ordering]
+    
+    fig_reach = go.Figure()
+    fig_reach.add_trace(go.Bar(
+        x=list(range(len(reachability_clean))),
+        y=reachability_clean.tolist(),
+        marker=dict(
+            color=ordered_hdbscan_labels.tolist(),  # Color by HDBSCAN clusters
+            colorscale='Viridis', 
+            line=dict(width=0),
+            showscale=True,
+            colorbar=dict(title="Cluster")
+        ),
+        name='Reachability Distance',
+        hovertemplate='<b>Point %{x}</b><br>Distance: %{y:.3f}<br>Cluster: %{marker.color}<extra></extra>'
+    ))
+    fig_reach.update_layout(
+        template='plotly_white',
+        title='Reachability Plot',
+        xaxis_title='Sample Index (Ordered)',
+        yaxis_title='Reachability Distance',
+        margin=dict(l=20, r=20, t=40, b=20),
+        height=400
+    )
+ 
+    # Generate 2D Projection (t-SNE)
+    if precomputed_projection is not None:
+        projection = precomputed_projection
+    else:
+        try:
+            from sklearn.manifold import TSNE
+            n_samples = data.shape[0]
+            perplexity = min(30, max(1, n_samples // 3))
+            
+            # Use exact method for tiny datasets to prevent barnes_hut bugs
+            method = 'exact' if n_samples < 50 else 'barnes_hut'
+            
+            # PCA initialization requires at least as many features as n_components (2)
+            init_method = 'random' if data.shape[1] < 2 or n_samples < 2 else 'pca'
+            
+            tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42, method=method, init=init_method)
+            projection = tsne.fit_transform(data)
+        except Exception as e:
+            print(f"Warning: t-SNE projection failed: {e}. Generating fallback projection.")
+            if data.shape[1] >= 2:
+                projection = data[:, :2]
+            elif data.shape[1] == 1:
+                projection = np.column_stack((data[:, 0], np.zeros(data.shape[0])))
+            else:
+                projection = np.zeros((data.shape[0], 2))
+    
+    fig_map = go.Figure()
+    fig_map.add_trace(go.Scatter(
+        x=projection[:, 0].tolist(),
+        y=projection[:, 1].tolist(),
+        mode='markers',
+        marker=dict(
+            size=8,
+            color=labels.tolist(), # Color by cluster label
+            colorscale='Viridis',
+            showscale=True,
+            line=dict(width=1, color='DarkSlateGrey')
+        ),
+        text=[f"Cluster: {l}" for l in labels],
+        hoverinfo='text'
+    ))
+    
+    fig_map.update_layout(
+        template='plotly_white',
+        title='2D Projection (t-SNE)',
+        xaxis_title='Dimension 1',
+        yaxis_title='Dimension 2',
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+
+    metrics = {}
+    if true_labels is not None:
+        # Filter out noise points (-1) from evaluation if desired, 
+        # but standard ARI/AMI handles them as just another label.
+        # However, it's often better to check alignment.
+        
+        # Ensure lengths match
+        if len(true_labels) == len(labels):
+            metrics['ARI'] = adjusted_rand_score(true_labels, labels)
+            metrics['AMI'] = adjusted_mutual_info_score(true_labels, labels)
+        else:
+            metrics['error'] = "Label file length does not match data length."
+
+    return {
+        'labels': labels.tolist(),
+        'probabilities': probabilities.tolist(),
+        'n_clusters': int(labels.max() + 1),
+        'noise_points': int((labels == -1).sum()),
+        'dendrogram_json': fig_dendro.to_json(),
+        'reachability_json': fig_reach.to_json(),
+        'map_json': fig_map.to_json(),
+        'metrics': metrics,
+        'linkage_z': Z.tolist(),
+        'optics_time': round(optics_time, 4),
+        'clustering_time': round(clustering_time, 4),
+        'algorithm': algorithm
+    }
+
