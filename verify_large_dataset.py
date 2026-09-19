@@ -1,4 +1,5 @@
 import pandas as pd
+# pyrefly: ignore [missing-import]
 import numpy as np
 from sklearn.datasets import make_blobs
 import os
@@ -6,7 +7,7 @@ import sys
 
 # Add project root to path
 sys.path.append(os.getcwd())
-from app.core.batch import run_batch_clustering, analyze_batch_results
+from mustache.core.batch import run_batch_clustering, analyze_batch_results
 
 def verify_large_dataset():
     print("=== Generating Large Synthetic Dataset ===")

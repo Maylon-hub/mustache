@@ -1,0 +1,56 @@
+﻿from pathlib import Path
+
+p = Path(r'C:\Users\guest\Documents\GitHub\mustache\pyproject.toml')
+new_toml = '''[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mustache-core"
+version = "0.2.0"
+description = "MustaCHE (Multiple Cluster Hierarchies Explorer) integrated with pre-compiled Core-SG"
+authors = [
+    {name = "MustaCHE Authors", email = "authors@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Flask>=3.0.0",
+    "core-sg-mustache>=0.3.0",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "scipy",
+    "plotly"
+]
+
+[project.scripts]
+mustache = "mustache.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["mustache*"]
+exclude = ["tests*", "docs*", "scripts*", "legacy*"]
+
+[tool.setuptools.package-data]
+mustache = ["static/**/*", "templates/**/*"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["*.pdf", "*.png", "*.jpg", "*.bat", "*.sh"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-flask>=1.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_clustering.py", "test_batch.py", "test_hai.py", "test_api_routes.py"]
+addopts = "-v --tb=short -p no:flask"
+'''
+
+p.write_text(new_toml, encoding='utf-8')
+print("Successfully updated mustache pyproject.toml!")
