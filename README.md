@@ -46,25 +46,34 @@ python -m venv .venv
 Activate the environment based on your operating system and shell:
 
 - **Windows (PowerShell)**:
+
   ```powershell
   .\.venv\Scripts\Activate.ps1
   ```
+
   > [!TIP]
   > **PowerShell Script Execution Error (`PSSecurityException`)?**  
   > If Windows blocks the script execution, run this command **once** in PowerShell to allow virtual environment scripts for your current user:
+>
   > ```powershell
   > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
   > ```
+>
   > Press `Y` (or `S`) when prompted, then re-run `.\.venv\Scripts\Activate.ps1`.
 - **Windows (Command Prompt / CMD)**:
+
   ```cmd
   .\.venv\Scripts\activate.bat
   ```
+
 - **Windows (Git Bash)**:
+
   ```bash
   source .venv/Scripts/activate
   ```
+
 - **Linux / macOS (Bash / Zsh)**:
+
   ```bash
   source .venv/bin/activate
   ```
@@ -82,6 +91,7 @@ python -m pip install --upgrade pip
 A single `pip install` command installs MustaCHE along with all required dependencies—including the **`core-sg-mustache`** backend engine, Flask, NumPy, Pandas, Scikit-Learn, Scipy, HDBSCAN, and Plotly. **End users do not need to install `core-sg-mustache` separately.**
 
 - **From TestPyPI (Current release v0.2.0)**:
+
   ```bash
   pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ mustache-core==0.2.0
   ```
@@ -94,6 +104,7 @@ A single `pip install` command installs MustaCHE along with all required depende
 
 > [!NOTE]
 > The package is named **`mustache-core`** for installation via `pip`, but inside Python scripts and notebooks you import it as:
+>
 > ```python
 > import mustache
 > ```
@@ -107,11 +118,13 @@ mustache
 ```
 
 Custom host and port options:
+
 ```bash
 mustache --host 127.0.0.1 --port 5000 --debug
 ```
 
 *(Alternative command if the global script is not directly resolved in your shell)*:
+
 ```bash
 python -m mustache.cli
 ```
@@ -133,6 +146,7 @@ If you are developing locally or contributing to the codebase, follow these step
 ### Step-by-Step Guide
 
 1. **Clone the Repository**:
+
    ```bash
    git clone https://github.com/maylon-hub/mustache.git
    cd mustache
@@ -140,26 +154,34 @@ If you are developing locally or contributing to the codebase, follow these step
 
 2. **Create and Activate a Virtual Environment**:
    - **Windows (PowerShell)**:
+
      ```powershell
      python -m venv .venv
      .\.venv\Scripts\Activate.ps1
      ```
+
      *(If script execution is blocked, run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` once)*
    - **Windows (Command Prompt / CMD)**:
+
      ```cmd
      .\.venv\Scripts\activate.bat
      ```
+
    - **Windows (Git Bash)**:
+
      ```bash
      source .venv/Scripts/activate
      ```
+
    - **Linux / macOS**:
+
      ```bash
      python3 -m venv .venv
      source .venv/bin/activate
      ```
 
 3. **Install Dependencies and the Package in Editable Mode**:
+
    ```bash
    python -m pip install --upgrade pip
    pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ -e .
@@ -167,6 +189,7 @@ If you are developing locally or contributing to the codebase, follow these step
 
    > [!NOTE]
    > - If developing both packages simultaneously from source, build and install your local clone of `core-sg-mustache` first:
+>
    >   ```bash
    >   pip install -e ../core-sg
    >   pip install -e .
@@ -174,11 +197,13 @@ If you are developing locally or contributing to the codebase, follow these step
 
 4. **Start the Application**:
    You can run the server via the CLI command:
+
    ```bash
    mustache
    ```
 
    Or run it directly as a Python module:
+
    ```bash
    python -m mustache.cli
    ```
@@ -227,22 +252,27 @@ print(f"Processed {len(batch_results['results'])} hierarchies.")
 ## 📖 Usage Guide
 
 ### 1. Upload Dataset
+
 - Under the **Dataset (CSV)** section, upload a CSV file containing numerical feature values (comma-separated).
 
 ### 2. (Optional) Ground Truth Labels
+
 - Upload a single-column CSV containing integer cluster labels to calculate ARI and AMI validation metrics.
 
 ### 3. Configure Clustering Parameters
+
 - **Min Cluster Size**: Smallest grouping considered a valid cluster.
 - **Min Samples**: Density threshold / neighborhood size.
 - **Distance Metric**: `Euclidean` or `Manhattan`.
 - **Algorithm**: `core-sg` (recommended for fast Cython MST computation) or `hdbscan` (standalone reference HDBSCAN).
 
 ### 4. Batch Analysis
+
 - In the **Batch Analysis** section, define a range of $m_{pts}$ values (`Min`, `Max`, `Step`).
 - MustaCHE runs the hierarchy sweep, calculates the HAI similarity matrix, builds the meta-clustering dendrogram, and caches the reachability plots.
 
 ### 5. Export Results
+
 - Click **"Export JSON"** to download metrics, cluster labels, and chart data.
 
 ---

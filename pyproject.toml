@@ -4,16 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mustache-core"
-version = "0.2.0"
+version = "0.3.0"
 description = "MustaCHE (Multiple Cluster Hierarchies Explorer) integrated with pre-compiled Core-SG"
 authors = [
-    {name = "MustaCHE Authors", email = "authors@example.com"}
+    {name = "Maylon Martins de Melo", email = "maylonmmartins@estudante.ufscar.br"},
 ]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "Flask>=3.0.0",
-    "core-sg-mustache>=0.3.0",
+    "core-sg-mustache>=0.4.0",
     "numpy",
     "pandas",
     "scikit-learn",
@@ -35,7 +35,8 @@ exclude = ["tests*", "docs*", "scripts*", "legacy*"]
 mustache = ["static/**/*", "templates/**/*"]
 
 [tool.setuptools.exclude-package-data]
-"*" = ["*.pdf", "*.png", "*.jpg", "*.bat", "*.sh"]
+mustache = ["*.pdf", "*.bat", "*.sh"]
+# Removido *.png e *.jpg para preservar as imagens da Web UI
 
 [project.optional-dependencies]
 dev = [
