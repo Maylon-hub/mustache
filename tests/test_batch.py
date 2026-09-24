@@ -60,6 +60,19 @@ class TestRunBatchClustering:
             assert result['algorithm'] == 'hdbscan', \
                 f"Algorithm field mismatch for mpts={mpts_key}"
 
+    def test_batch_uses_compact_visualization_payload(self, blobs_100):
+        X, _ = blobs_100
+        df = _df_from_array(X)
+        results = run_batch_clustering(df, min_mpts=5, max_mpts=5, step=1, algorithm='hdbscan')
+        result = results['5']
+
+        assert result['dendrogram_json'] is None
+        assert result['map_json'] is None
+        assert result['reachability_json'] is None
+        assert len(result['reachability_data']['x']) == X.shape[0]
+        assert len(result['reachability_data']['y']) == X.shape[0]
+        assert len(result['reachability_data']['labels']) == X.shape[0]
+
 
 class TestAnalyzeBatchResults:
     """Tests on the meta-analysis pipeline (HAI + meta-clustering)."""
@@ -137,3 +150,9 @@ class TestAnalyzeBatchResults:
         expected_sorted = sorted([int(k) for k in batch_results.keys()])
         assert list(ordered_mpts) == expected_sorted, \
             "ordered_mpts must match the sorted batch keys"
+
+    def test_outliers_are_exposed_for_the_ui(self, blobs_100):
+        X, _ = blobs_100
+        analysis = analyze_batch_results(self._run_batch(X))
+        assert isinstance(analysis.get('outliers'), list)
+        assert all(value in analysis['ordered_mpts'] for value in analysis['outliers'])

@@ -51,7 +51,7 @@ def compute_mutual_reachability(data, min_samples, metric='euclidean'):
 
 
 
-def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean', algorithm='core-sg', true_labels=None, precomputed_optics=None, core_model=None, precomputed_projection=None, extra_clustering_time=0.0):
+def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean', algorithm='core-sg', true_labels=None, precomputed_optics=None, core_model=None, precomputed_projection=None, extra_clustering_time=0.0, compact=False):
 
     """
     Runs clustering on the provided DataFrame.
@@ -93,7 +93,6 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
             probabilities = h_obj['probabilities_']
             Z = h_obj['single_linkage_tree_'].to_numpy().astype(float)
         
-        import plotly.figure_factory as ff
     else:
         import hdbscan
         clusterer = hdbscan.HDBSCAN(
@@ -108,7 +107,6 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         probabilities = clusterer.probabilities_
         
         from scipy.cluster.hierarchy import linkage, dendrogram
-        import plotly.figure_factory as ff
         
         # MR Distance Matrix
         mreach_matrix = compute_mutual_reachability(data, m_samples_val, metric)
@@ -121,15 +119,19 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
 
 
     
-    # Create Dendrogram Figure
-    fig_dendro = ff.create_dendrogram(data, linkagefun=lambda x: Z)
-    fig_dendro.update_layout(
-        template='plotly_white',
-        title='Hierarchical Clustering Dendrogram',
-        xaxis_title='Sample Index',
-        yaxis_title='Distance',
-        margin=dict(l=20, r=20, t=40, b=20)
-    )
+    # Individual dendrograms and maps are not used by the batch dashboard. In
+    # compact mode we avoid building/serializing them for every mpts value.
+    fig_dendro = None
+    if not compact:
+        import plotly.figure_factory as ff
+        fig_dendro = ff.create_dendrogram(data, linkagefun=lambda x: Z)
+        fig_dendro.update_layout(
+            template='plotly_white',
+            title='Hierarchical Clustering Dendrogram',
+            xaxis_title='Sample Index',
+            yaxis_title='Distance',
+            margin=dict(l=20, r=20, t=40, b=20)
+        )
 
     # Generate Reachability Plot
     # HDBSCAN doesn't produce a reachability plot directly like OPTICS, 
@@ -140,9 +142,10 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
     
     # Simplified approach: Use the linkage distances directly for now, 
     # ordered by the dendrogram leaves.
-    dendro_leaves = fig_dendro['layout']['xaxis']['ticktext']
-    # Map leaf indices to original data indices
-    ordered_indices = [int(i) for i in dendro_leaves]
+    ordered_indices = list(range(len(data)))
+    if fig_dendro is not None:
+        dendro_leaves = fig_dendro['layout']['xaxis']['ticktext']
+        ordered_indices = [int(i) for i in dendro_leaves]
     
     # We need a reachability distance for each point. 
     # In single linkage, this is roughly the height at which the point merges.
@@ -156,18 +159,8 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
     # This is complex to do perfectly without OPTICS, but we can plot the 
     # merge distances of the ordered points.
     
-    import plotly.graph_objects as go
-    
-    # Placeholder for true reachability: Plot distances of ordered points
-    # This is NOT a true reachability plot but gives a similar visual of density structure
-    # for verification purposes.
-    
-    fig_reach = go.Figure()
-    fig_reach.add_trace(go.Bar(
-        x=list(range(len(ordered_indices))),
-        y=[0] * len(ordered_indices), # Placeholder, need to calculate actual reachability
-        marker_color='#097B43'
-    ))
+    if not compact:
+        import plotly.graph_objects as go
     
     # Alternative: Use OPTICS from sklearn for the reachability plot specifically, 
     # as it's the standard for that visualization.
@@ -201,33 +194,34 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
     # Use HDBSCAN labels for coloring instead of OPTICS labels for consistency
     ordered_hdbscan_labels = labels[ordering]
     
-    fig_reach = go.Figure()
-    fig_reach.add_trace(go.Bar(
-        x=list(range(len(reachability_clean))),
-        y=reachability_clean.tolist(),
-        marker=dict(
-            color=ordered_hdbscan_labels.tolist(),  # Color by HDBSCAN clusters
-            colorscale='Viridis', 
-            line=dict(width=0),
-            showscale=True,
-            colorbar=dict(title="Cluster")
-        ),
-        name='Reachability Distance',
-        hovertemplate='<b>Point %{x}</b><br>Distance: %{y:.3f}<br>Cluster: %{marker.color}<extra></extra>'
-    ))
-    fig_reach.update_layout(
-        template='plotly_white',
-        title='Reachability Plot',
-        xaxis_title='Sample Index (Ordered)',
-        yaxis_title='Reachability Distance',
-        margin=dict(l=20, r=20, t=40, b=20),
-        height=400
-    )
+    fig_reach = None
+    if not compact:
+        fig_reach = go.Figure()
+        fig_reach.add_trace(go.Bar(
+            x=list(range(len(reachability_clean))),
+            y=reachability_clean.tolist(),
+            marker=dict(
+                color=ordered_hdbscan_labels.tolist(),
+                colorscale='Viridis',
+                line=dict(width=0),
+                showscale=True,
+                colorbar=dict(title="Cluster")
+            ),
+            name='Reachability Distance',
+            hovertemplate='<b>Point %{x}</b><br>Distance: %{y:.3f}<br>Cluster: %{marker.color}<extra></extra>'
+        ))
+        fig_reach.update_layout(
+            template='plotly_white',
+            title='Reachability Plot',
+            xaxis_title='Sample Index (Ordered)',
+            yaxis_title='Reachability Distance',
+            margin=dict(l=20, r=20, t=40, b=20),
+            height=400
+        )
  
-    # Generate 2D Projection (t-SNE)
-    if precomputed_projection is not None:
-        projection = precomputed_projection
-    else:
+    # Generate 2D projection only when a full single-analysis result needs it.
+    projection = precomputed_projection
+    if not compact and projection is None:
         try:
             from sklearn.manifold import TSNE
             n_samples = data.shape[0]
@@ -250,8 +244,10 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
             else:
                 projection = np.zeros((data.shape[0], 2))
     
-    fig_map = go.Figure()
-    fig_map.add_trace(go.Scatter(
+    fig_map = None
+    if not compact:
+        fig_map = go.Figure()
+        fig_map.add_trace(go.Scatter(
         x=projection[:, 0].tolist(),
         y=projection[:, 1].tolist(),
         mode='markers',
@@ -264,15 +260,15 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         ),
         text=[f"Cluster: {l}" for l in labels],
         hoverinfo='text'
-    ))
+        ))
     
-    fig_map.update_layout(
-        template='plotly_white',
-        title='2D Projection (t-SNE)',
-        xaxis_title='Dimension 1',
-        yaxis_title='Dimension 2',
-        margin=dict(l=20, r=20, t=40, b=20)
-    )
+        fig_map.update_layout(
+            template='plotly_white',
+            title='2D Projection (t-SNE)',
+            xaxis_title='Dimension 1',
+            yaxis_title='Dimension 2',
+            margin=dict(l=20, r=20, t=40, b=20)
+        )
 
     metrics = {}
     if true_labels is not None:
@@ -292,9 +288,14 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         'probabilities': probabilities.tolist(),
         'n_clusters': int(labels.max() + 1),
         'noise_points': int((labels == -1).sum()),
-        'dendrogram_json': fig_dendro.to_json(),
-        'reachability_json': fig_reach.to_json(),
-        'map_json': fig_map.to_json(),
+        'dendrogram_json': fig_dendro.to_json() if fig_dendro is not None else None,
+        'reachability_json': fig_reach.to_json() if fig_reach is not None else None,
+        'reachability_data': {
+            'x': list(range(len(reachability_clean))),
+            'y': reachability_clean.tolist(),
+            'labels': ordered_hdbscan_labels.tolist(),
+        } if compact else None,
+        'map_json': fig_map.to_json() if fig_map is not None else None,
         'metrics': metrics,
         'linkage_z': Z.tolist(),
         'optics_time': round(optics_time, 4),

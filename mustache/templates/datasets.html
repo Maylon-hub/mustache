@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card p-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap mb-3">
+        <div>
+            <h2 class="mb-1">Sample Datasets</h2>
+            <p class="text-muted mb-0">Reproducible datasets ready to run without downloading a CSV.</p>
+        </div>
+        <a class="btn btn-primary" href="/?new=1" onclick="setTimeout(openBatchConfigModal, 0)">
+            <i class="fas fa-upload mr-1"></i> Upload my CSV
+        </a>
+    </div>
+
+    <div class="row">
+        {% for dataset in datasets %}
+        <div class="col-lg-4 col-md-6 mb-3">
+            <div class="card h-100 border">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">{{ dataset.name }}</h5>
+                        <span class="badge badge-light border">{{ dataset.kind }}</span>
+                    </div>
+                    <p class="text-muted">{{ dataset.description }}</p>
+                    <div class="small mb-3">
+                        <strong>{{ dataset.samples }}</strong> samples · <strong>{{ dataset.features }}</strong> features
+                    </div>
+                    <a class="btn btn-sm btn-success" href="/?sample_dataset={{ dataset.key }}">
+                        <i class="fas fa-play mr-1"></i> Configure and run
+                    </a>
+                    <a class="btn btn-sm btn-outline-secondary ml-1" href="/api/datasets/{{ dataset.key }}/csv">
+                        <i class="fas fa-download mr-1"></i> CSV
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -7,6 +7,14 @@ import zipfile
 import io
 import pandas as pd
 from pathlib import Path
+from importlib.metadata import PackageNotFoundError, version
+
+
+def _package_version(distribution: str) -> str:
+    try:
+        return version(distribution)
+    except PackageNotFoundError:
+        return "development"
 
 def get_projects_dir() -> Path:
     """Returns the user projects storage directory (~/.mustache/projects)."""
@@ -57,6 +65,8 @@ def save_project(name: str, params: dict, analysis: dict, results: dict, raw_df:
         "mpts_min": params.get("min_mpts", 2),
         "mpts_max": params.get("max_mpts", 10),
         "step": params.get("step", 1),
+        "mustache_version": _package_version("mustache-core"),
+        "core_sg_version": _package_version("core-sg-mustache"),
         "status": "COMPLETED"
     }
 

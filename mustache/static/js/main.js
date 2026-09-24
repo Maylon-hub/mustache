@@ -65,6 +65,22 @@ async function confirmSaveProjectMain() {
 window.confirmSaveProjectMain = confirmSaveProjectMain;
 
 document.addEventListener('DOMContentLoaded', () => {
+    const settingsKey = 'mustache.settings.v1';
+    let userSettings = {};
+    try { userSettings = JSON.parse(localStorage.getItem(settingsKey) || '{}'); } catch (_) {}
+    document.querySelectorAll('[data-mustache-setting]').forEach((field) => {
+        const name = field.dataset.mustacheSetting;
+        if (userSettings[name] !== undefined) field.value = userSettings[name];
+    });
+    const haiScaleSelect = document.getElementById('hai-scale-mode');
+    if (haiScaleSelect) {
+        haiScaleSelect.value = userSettings.hai_scale || 'adaptive';
+        haiScaleSelect.addEventListener('change', () => {
+            userSettings.hai_scale = haiScaleSelect.value;
+            if (latestAnalysis) renderHAIMatrix(latestAnalysis.hai_matrix, latestAnalysis.ordered_mpts);
+        });
+    }
+
     // Sidebar Toggle
     const btnToggle = document.querySelector('.fa-bars');
     const sidebar = document.querySelector('.sidebar');
@@ -248,7 +264,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Update Project Info Sidebar
-                const fileName = formData.get('file')?.name || 'Uploaded File';
+                const sampleDataset = formData.get('sample_dataset');
+                const fileName = sampleDataset || formData.get('file')?.name || 'Uploaded File';
                 document.getElementById('proj-name').innerText = fileName;
                 document.getElementById('proj-min-mpts').innerText = formData.get('min_mpts');
                 if (timeDisplay && data.execution_time) {
@@ -350,6 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 const cached = clientCutCache.get(cacheKey);
                                 latestAnalysis.meta_labels = cached.meta_labels;
                                 latestAnalysis.medoids = cached.medoids;
+                                latestAnalysis.outliers = [];
                                 renderReachabilityPlots(cached.meta_labels, cached.medoids, true);
                                 return;
                             }
@@ -368,6 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                                 latestAnalysis.meta_labels = cutData.meta_labels;
                                 latestAnalysis.medoids = cutData.medoids;
+                                latestAnalysis.outliers = [];
                                 renderReachabilityPlots(cutData.meta_labels, cutData.medoids, cutData.from_cache);
                             } catch (err) {
                                 console.error('Dendrogram cut failed:', err);
@@ -395,6 +414,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Helper Functions ---
 
     function renderHAIMatrix(matrix, mpts_labels) {
+        const flattened = matrix.flat().filter(Number.isFinite);
+        const observedMin = flattened.length ? Math.min(...flattened) : 0;
+        const observedMax = flattened.length ? Math.max(...flattened) : 1;
+        const scaleMode = haiScaleSelect?.value || userSettings.hai_scale || 'adaptive';
+        const fixedScale = scaleMode === 'fixed';
+        const offDiagonal = [];
+        matrix.forEach((row, rowIndex) => row.forEach((value, columnIndex) => {
+            if (rowIndex !== columnIndex && Number.isFinite(value)) offDiagonal.push(value);
+        }));
+        offDiagonal.sort((a, b) => a - b);
+        const robustIndex = Math.min(offDiagonal.length - 1, Math.floor(offDiagonal.length * 0.10));
+        const robustMin = offDiagonal.length ? offDiagonal[Math.max(0, robustIndex)] : observedMin;
+        const colorMin = fixedScale ? 0 : (scaleMode === 'robust' ? robustMin : observedMin);
         const data = [{
             z: matrix,
             x: mpts_labels,
@@ -402,6 +434,9 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'heatmap',
             colorscale: 'Purples',
             reversescale: true,
+            zmin: colorMin,
+            zmax: fixedScale ? 1 : observedMax,
+            hovertemplate: 'mpts %{y} × %{x}<br>HAI: %{z:.6f}<extra></extra>',
             showscale: true,
             colorbar: {
                 orientation: 'h',
@@ -414,6 +449,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const layout = {
             margin: { t: 30, r: 20, l: 40, b: 60 },
+            annotations: [{
+                text: scaleMode === 'fixed'
+                    ? 'Scale: fixed [0, 1]'
+                    : scaleMode === 'robust'
+                        ? `Scale: robust [${robustMin.toFixed(4)}, ${observedMax.toFixed(4)}], lowest 10% clipped`
+                        : `Scale: adaptive [${observedMin.toFixed(4)}, ${observedMax.toFixed(4)}]`,
+                xref: 'paper', yref: 'paper', x: 1, y: 1.12,
+                xanchor: 'right', showarrow: false,
+                font: { size: 10, color: '#6c757d' }
+            }],
             xaxis: {
                 side: 'top',
                 tickfont: { size: 10 },
@@ -436,13 +481,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!container) return;
 
         // Check if medoids partition changed
-        const newSig = Object.values(medoids_mpts || {}).sort((a, b) => a - b).join('-');
+        const outliers = (latestAnalysis?.outliers || []).map(Number).sort((a, b) => a - b);
+        const medoidValues = Object.values(medoids_mpts || {}).map(Number).sort((a, b) => a - b);
+        const newSig = `${medoidValues.join('-')}|outliers:${outliers.join('-')}`;
         const cacheIndicator = document.getElementById('cache-indicator');
         if (cacheIndicator) {
-            const count = Object.keys(medoids_mpts || {}).length;
+            const count = medoidValues.length;
+            const outlierText = outliers.length ? ` + ${outliers.length} outlier${outliers.length > 1 ? 's' : ''}` : '';
             cacheIndicator.innerHTML = isCached || (currentMedoidsSignature === newSig && currentMedoidsSignature !== '')
-                ? `<i class="fas fa-bolt text-warning mr-1"></i> Instant Cache (${count} groups)`
-                : `<i class="fas fa-check-circle text-success mr-1"></i> Active (${count} groups)`;
+                ? `<i class="fas fa-bolt text-warning mr-1"></i> Instant Cache (${count} groups${outlierText})`
+                : `<i class="fas fa-check-circle text-success mr-1"></i> Active (${count} groups${outlierText})`;
         }
 
         // If medoids are identical to already rendered, avoid re-rendering DOM
@@ -453,19 +501,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         container.innerHTML = ''; // Clear previous plots
 
-        const uniqueLabels = [...new Set(labels)].sort((a, b) => a - b);
         const colors = ['#00bcd4', '#2196f3', '#4caf50', '#673ab7', '#ff9800', '#e91e63'];
 
         let i = 0;
-        uniqueLabels.forEach(label => {
-            if (label === -1) return; // Ignore noise
-
-            const mptsValue = medoids_mpts[label];
+        const plots = medoidValues.map((mpts) => ({ mpts, outlier: false }))
+            .concat(outliers.map((mpts) => ({ mpts, outlier: true })));
+        plots.forEach(({ mpts: mptsValue, outlier }) => {
             const result = batchResults ? batchResults[mptsValue] : null;
 
-            if (!result || !result.reachability_json) return;
+            if (!result || (!result.reachability_json && !result.reachability_data)) return;
 
-            const color = colors[i % colors.length];
+            const color = outlier ? '#dc3545' : colors[i % colors.length];
 
             // Create wrapper div
             const wrapperId = 'reach-plot-' + mptsValue;
@@ -476,8 +522,24 @@ document.addEventListener('DOMContentLoaded', () => {
             rDiv.id = wrapperId;
             container.appendChild(rDiv);
 
-            // Parse Plotly JSON
-            const figure = JSON.parse(result.reachability_json);
+            // New batch responses use compact arrays; saved/legacy projects may
+            // still contain a complete Plotly figure.
+            const figure = result.reachability_json
+                ? JSON.parse(result.reachability_json)
+                : {
+                    data: [{
+                        type: 'bar',
+                        x: result.reachability_data.x,
+                        y: result.reachability_data.y,
+                        marker: { color: result.reachability_data.labels },
+                        hovertemplate: '<b>Point %{x}</b><br>Distance: %{y:.3f}<extra></extra>'
+                    }],
+                    layout: {
+                        template: 'plotly_white',
+                        xaxis: { title: 'Sample Index (Ordered)' },
+                        yaxis: { title: 'Reachability Distance' }
+                    }
+                };
 
             // Override colors and layout for small multiples
             if (figure.data && figure.data[0]) {
@@ -487,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
             figure.layout.margin = { t: 15, r: 10, l: 30, b: 35 };
 
             figure.layout.annotations = [{
-                text: 'Medoid mpts: ' + mptsValue,
+                text: (outlier ? 'Outlier mpts: ' : 'Medoid mpts: ') + mptsValue,
                 xref: 'paper', yref: 'paper',
                 x: 0.5, y: -0.1,
                 showarrow: false,
@@ -544,7 +606,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 editable: true
             }];
 
-            Plotly.react('meta-dendrogram', figure.data, figure.layout, {
+            // Clear spinner/placeholder before initializing Plotly.
+            // Plotly.react silently fails when the div contains arbitrary HTML
+            // (not an existing Plotly plot), leaving the spinner stuck forever.
+            const dendroContainer = document.getElementById('meta-dendrogram');
+            if (dendroContainer) dendroContainer.innerHTML = '';
+
+            Plotly.newPlot('meta-dendrogram', figure.data, figure.layout, {
                 responsive: true, displayModeBar: false,
                 edits: { shapePosition: true }
             });

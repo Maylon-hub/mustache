@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, send_file
+from flask import Blueprint, render_template, request, jsonify, send_file, Response
 import pandas as pd
 import time
 from .core import run_clustering
@@ -30,7 +30,26 @@ def index():
             'ordered_mpts': None
         })
     project_id = request.args.get('project_id', '')
-    return render_template('index.html', project_id=project_id)
+    sample_dataset = request.args.get('sample_dataset', '')
+    return render_template('index.html', project_id=project_id, sample_dataset=sample_dataset)
+
+@main.route('/datasets')
+def datasets_page():
+    from .core.sample_datasets import list_datasets
+    return render_template('datasets.html', datasets=list_datasets())
+
+@main.route('/api/datasets/<dataset_key>/csv')
+def sample_dataset_csv(dataset_key):
+    from .core.sample_datasets import load_dataset
+    try:
+        frame, info = load_dataset(dataset_key)
+    except KeyError as exc:
+        return jsonify({'error': str(exc)}), 404
+    return Response(
+        frame.to_csv(index=False),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename={dataset_key}.csv'}
+    )
 
 @main.route('/projects')
 def projects_page():
@@ -74,6 +93,7 @@ def save_project_route():
         'ordered_mpts': SESSION_DATA.get('ordered_mpts'),
         'meta_labels': SESSION_DATA.get('meta_labels'),
         'medoids': SESSION_DATA.get('last_medoids'),
+        'outliers': SESSION_DATA.get('outliers', []),
         'meta_dendrogram_json': SESSION_DATA.get('meta_dendrogram_json')
     }
     
@@ -98,6 +118,7 @@ def get_project_data(project_id):
         SESSION_DATA['dataset_name'] = data.get('metadata', {}).get('name', 'dataset')
         SESSION_DATA['cut_cache'] = {}
         SESSION_DATA['last_medoids'] = analysis.get('medoids', {})
+        SESSION_DATA['outliers'] = analysis.get('outliers', [])
         SESSION_DATA['meta_dendrogram_json'] = analysis.get('meta_dendrogram_json')
         
         return jsonify({
@@ -182,20 +203,26 @@ def upload_file():
 
 @main.route('/batch', methods=['POST'])
 def batch_process():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
+    sample_dataset = request.form.get('sample_dataset', '').strip()
+    file = request.files.get('file')
+    if not sample_dataset and (file is None or file.filename == ''):
+        return jsonify({'error': 'Select a CSV file or a sample dataset.'}), 400
         
     start_time = time.time()
     try:
-        # Read CSV with header inference
-        df = pd.read_csv(file)
+        if sample_dataset:
+            from .core.sample_datasets import load_dataset
+            df, dataset_info = load_dataset(sample_dataset)
+            dataset_name = dataset_info.name
+        else:
+            # Read CSV with header inference
+            df = pd.read_csv(file)
+            dataset_name = file.filename
         
         # Validate numeric data
         if df.select_dtypes(include=[np.number]).empty:
+            if file is None:
+                return jsonify({'error': 'The sample dataset contains no numerical data.'}), 400
             file.seek(0)
             df = pd.read_csv(file, header=None)
             if df.select_dtypes(include=[np.number]).empty:
@@ -221,11 +248,12 @@ def batch_process():
         SESSION_DATA['ordered_mpts'] = analysis.get('ordered_mpts')
         SESSION_DATA['meta_labels'] = analysis.get('meta_labels')
         SESSION_DATA['last_medoids'] = analysis.get('medoids')
+        SESSION_DATA['outliers'] = analysis.get('outliers', [])
         SESSION_DATA['meta_dendrogram_json'] = analysis.get('meta_dendrogram_json')
         SESSION_DATA['results'] = results
         SESSION_DATA['raw_data'] = df
         SESSION_DATA['cut_cache'] = {}
-        SESSION_DATA['dataset_name'] = getattr(file, 'filename', 'dataset.csv')
+        SESSION_DATA['dataset_name'] = dataset_name
         SESSION_DATA['params'] = {
             'min_mpts': min_mpts,
             'max_mpts': max_mpts,

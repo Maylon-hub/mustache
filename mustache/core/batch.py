@@ -32,19 +32,6 @@ def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algor
     amortized_optics_time = optics_time_total / n_iters
     precomputed_optics = (optics_model.reachability_, optics_model.ordering_, amortized_optics_time)
 
-    # Precompute 2D projection (t-SNE) once for the entire batch to avoid redundant projection calculations
-    precomputed_projection = None
-    try:
-        from sklearn.manifold import TSNE
-        n_samples = data_np.shape[0]
-        perplexity = min(30, max(1, n_samples // 3))
-        method = 'exact' if n_samples < 50 else 'barnes_hut'
-        init_method = 'random' if data_np.shape[1] < 2 or n_samples < 2 else 'pca'
-        tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42, method=method, init=init_method)
-        precomputed_projection = tsne.fit_transform(data_np)
-    except Exception as e:
-        print(f"Warning: Batch t-SNE precomputation failed: {e}")
-
     # For Core-SG: Build the support graph ONCE up to k_max = max_mpts (ICDE 2022)
     # Then extract each hierarchy for k <= k_max in milliseconds.
     core_model = None
@@ -77,8 +64,9 @@ def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algor
                 algorithm=algorithm,
                 precomputed_optics=precomputed_optics,
                 core_model=core_model,
-                precomputed_projection=precomputed_projection,
-                extra_clustering_time=amortized_core_fit_time
+                precomputed_projection=None,
+                extra_clustering_time=amortized_core_fit_time,
+                compact=True,
             )
             results[str(mpts)] = cluster_result
         except Exception as e:
@@ -144,52 +132,49 @@ def analyze_batch_results(batch_results):
     
     try:
         Z = np.array(meta_linkage)
+
+        if len(dendro_labels) == 1:
+            fig_meta_dendro = go.Figure(data=[go.Scatter(
+                x=[5], y=[0], mode='markers+text', text=dendro_labels,
+                textposition='bottom center', marker=dict(size=8, color='#2196F3'),
+                hovertemplate='mpts %{text}<extra></extra>'
+            )])
+            fig_meta_dendro.update_layout(
+                template='plotly_white', title='Meta-Clustering Dendrogram (single hierarchy)',
+                xaxis=dict(visible=False), yaxis=dict(title='Distance (1 - HAI)', range=[0, 1]),
+                margin=dict(l=50, r=20, t=50, b=60), hovermode=False
+            )
+            meta_dendro_json = fig_meta_dendro.to_json()
+        else:
+            # Get dendrogram coordinate layout from scipy (no rendering)
+            ddict = sp_dendrogram(Z, labels=dendro_labels, no_plot=True)
         
-        # Get dendrogram coordinate layout from scipy (no rendering)
-        ddict = sp_dendrogram(Z, labels=dendro_labels, no_plot=True)
-        
-        icoord = np.array(ddict['icoord'])  # X-coords of each branch (N-1 x 4)
-        dcoord = np.array(ddict['dcoord'])  # Y-coords (heights) of each branch (N-1 x 4)
-        leaf_labels = ddict['ivl']           # Leaf labels in left-to-right order
+            icoord = np.array(ddict['icoord'])
+            dcoord = np.array(ddict['dcoord'])
+            leaf_labels = ddict['ivl']
         
         # Build one Scatter trace per branch (each row of icoord/dcoord is one U-shape)
-        traces = []
-        for xs, ys in zip(icoord.tolist(), dcoord.tolist()):
-            traces.append(go.Scatter(
-                x=xs,
-                y=ys,
-                mode='lines',
-                line=dict(color='#2196F3', width=2),
-                hoverinfo='skip',
-                showlegend=False
-            ))
+            traces = []
+            for xs, ys in zip(icoord.tolist(), dcoord.tolist()):
+                traces.append(go.Scatter(
+                    x=xs, y=ys, mode='lines',
+                    line=dict(color='#2196F3', width=2),
+                    hoverinfo='skip', showlegend=False
+                ))
         
         # X-axis tick positions: scipy places leaves at 5, 15, 25, ... (10 apart)
-        n_leaves = len(leaf_labels)
-        tick_vals = [10 * i + 5 for i in range(n_leaves)]
+            n_leaves = len(leaf_labels)
+            tick_vals = [10 * i + 5 for i in range(n_leaves)]
         
-        layout = go.Layout(
-            template='plotly_white',
-            title='Meta-Clustering Dendrogram (Hierarchies)',
-            xaxis=dict(
-                tickvals=tick_vals,
-                ticktext=leaf_labels,
-                title='mpts Parameter',
-                showgrid=False,
-                zeroline=False
-            ),
-            yaxis=dict(
-                title='Distance (1 - HAI)',
-                showgrid=True,
-                zeroline=True,
-                rangemode='tozero'
-            ),
-            margin=dict(l=50, r=20, t=50, b=60),
-            hovermode=False
-        )
+            layout = go.Layout(
+                template='plotly_white', title='Meta-Clustering Dendrogram (Hierarchies)',
+                xaxis=dict(tickvals=tick_vals, ticktext=leaf_labels, title='mpts Parameter', showgrid=False, zeroline=False),
+                yaxis=dict(title='Distance (1 - HAI)', showgrid=True, zeroline=True, rangemode='tozero'),
+                margin=dict(l=50, r=20, t=50, b=60), hovermode=False
+            )
         
-        fig_meta_dendro = go.Figure(data=traces, layout=layout)
-        meta_dendro_json = fig_meta_dendro.to_json()
+            fig_meta_dendro = go.Figure(data=traces, layout=layout)
+            meta_dendro_json = fig_meta_dendro.to_json()
     except Exception as e:
         print(f"Error generating meta-dendrogram: {e}")
         import traceback; traceback.print_exc()
@@ -205,6 +190,11 @@ def analyze_batch_results(batch_results):
     for label, idx in medoids_map.items():
         medoids_mpts[int(label)] = int(sorted_keys[idx])
     medoids_time = time.time() - t_medoids_start
+    outlier_mpts = [
+        int(sorted_keys[index])
+        for index, label in enumerate(meta_labels)
+        if int(label) == -1
+    ]
     
     # Identify algorithm used in batch
     algo_used = "HDBSCAN/Core-SG"
@@ -230,6 +220,7 @@ def analyze_batch_results(batch_results):
         'meta_linkage': meta_linkage.tolist() if isinstance(meta_linkage, np.ndarray) else meta_linkage,
         'meta_dendrogram_json': meta_dendro_json,
         'medoids': medoids_mpts,
+        'outliers': outlier_mpts,
         'ordered_mpts': [int(k) for k in sorted_keys],
         'times': {
             'clustering_runs_time': round(total_clustering_time, 4),

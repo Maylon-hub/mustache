@@ -1,29 +1,71 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="card">
+<div class="card p-4">
     <h2>Settings</h2>
-    <p>Configurações da aplicação MustaCHE.</p>
+    <p class="text-muted">Defaults are stored in this browser and applied to new batch analyses.</p>
 
-    <div class="form-group">
-        <label>Default Min Cluster Size</label>
-        <input type="number" value="5" min="2">
-    </div>
-
-    <div class="form-group">
-        <label>Default Min Samples</label>
-        <input type="number" value="5" min="1">
-    </div>
-
-    <div class="form-group">
-        <label>Distance Metric</label>
-        <select>
-            <option value="euclidean" selected>Euclidean</option>
-            <option value="manhattan">Manhattan</option>
-            <option value="cosine">Cosine</option>
-        </select>
-    </div>
-
-    <p><em>Configurações em desenvolvimento...</em></p>
+    <form id="settings-form" style="max-width: 560px;">
+        <div class="form-row">
+            <div class="form-group col-md-4">
+                <label for="setting-min-mpts">Min mpts</label>
+                <input id="setting-min-mpts" class="form-control" name="min_mpts" type="number" value="2" min="2" required>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="setting-max-mpts">Max mpts</label>
+                <input id="setting-max-mpts" class="form-control" name="max_mpts" type="number" value="50" min="2" required>
+            </div>
+            <div class="form-group col-md-4">
+                <label for="setting-step">Step</label>
+                <input id="setting-step" class="form-control" name="step" type="number" value="2" min="1" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="setting-algorithm">Default algorithm</label>
+            <select id="setting-algorithm" class="form-control" name="algorithm">
+                <option value="core-sg" selected>Core-SG</option>
+                <option value="hdbscan">HDBSCAN</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="setting-hai-scale">HAI color scale</label>
+            <select id="setting-hai-scale" class="form-control" name="hai_scale">
+                <option value="adaptive" selected>Adaptive (highlights differences)</option>
+                <option value="robust">Robust contrast (clips the lowest 10%)</option>
+                <option value="fixed">Fixed 0–1 (compares different runs)</option>
+            </select>
+            <small class="form-text text-muted">The current numeric range is always shown on the HAI plot.</small>
+        </div>
+        <button class="btn btn-success" type="submit"><i class="fas fa-save mr-1"></i> Save settings</button>
+        <a class="btn btn-light ml-2" href="/">Back to explorer</a>
+        <span id="settings-saved" class="text-success ml-3" role="status"></span>
+    </form>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const key = 'mustache.settings.v1';
+    const defaults = { min_mpts: 2, max_mpts: 50, step: 2, algorithm: 'core-sg', hai_scale: 'adaptive' };
+    let settings = defaults;
+    try { settings = { ...defaults, ...JSON.parse(localStorage.getItem(key) || '{}') }; } catch (_) {}
+    const form = document.getElementById('settings-form');
+    Object.entries(settings).forEach(([name, value]) => {
+        const field = form.elements.namedItem(name);
+        if (field) field.value = value;
+    });
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const values = Object.fromEntries(new FormData(form).entries());
+        values.min_mpts = Number(values.min_mpts);
+        values.max_mpts = Number(values.max_mpts);
+        values.step = Number(values.step);
+        if (values.max_mpts < values.min_mpts) {
+            document.getElementById('settings-saved').textContent = 'Max mpts must be at least Min mpts.';
+            return;
+        }
+        localStorage.setItem(key, JSON.stringify(values));
+        document.getElementById('settings-saved').textContent = 'Settings saved.';
+    });
+});
+</script>
 {% endblock %}

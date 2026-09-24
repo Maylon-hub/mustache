@@ -9,13 +9,16 @@
                 <span class="mr-3 font-weight-bold"><i class="fas fa-sitemap mr-1"></i> Dendrogram</span>
                 <!-- Interactive Toolbar inspired by Legacy 2017 -->
                 <div class="btn-group btn-group-sm mr-2 my-1" role="group" aria-label="Tools">
-                    <button id="btn-tool-wand" type="button" class="btn btn-light border active" title="Select / Highlight Branches" onclick="setDendroTool('select')">
+                    <button id="btn-tool-wand" type="button" class="btn btn-light border active"
+                        title="Select / Highlight Branches" onclick="setDendroTool('select')">
                         <i class="fas fa-magic text-primary"></i>
                     </button>
-                    <button id="btn-tool-cut" type="button" class="btn btn-light border" title="Adjust Cut Threshold Line" onclick="setDendroTool('cut')">
+                    <button id="btn-tool-cut" type="button" class="btn btn-light border"
+                        title="Adjust Cut Threshold Line" onclick="setDendroTool('cut')">
                         <i class="fas fa-arrows-alt-v text-danger"></i>
                     </button>
-                    <button id="btn-tool-pan" type="button" class="btn btn-light border" title="Pan / Drag" onclick="setDendroTool('pan')">
+                    <button id="btn-tool-pan" type="button" class="btn btn-light border" title="Pan / Drag"
+                        onclick="setDendroTool('pan')">
                         <i class="fas fa-hand-paper text-secondary"></i>
                     </button>
                 </div>
@@ -27,20 +30,25 @@
                     <button type="button" class="btn btn-light border" title="Zoom Out" onclick="zoomDendrogram(0.8)">
                         <i class="fas fa-search-minus"></i>
                     </button>
-                    <button type="button" class="btn btn-light border" title="Reset Zoom (100%)" onclick="resetDendrogramZoom()">
+                    <button type="button" class="btn btn-light border" title="Reset Zoom (100%)"
+                        onclick="resetDendrogramZoom()">
                         100%
                     </button>
                 </div>
-                <span id="selected-branches-badge" class="badge badge-info my-1 ml-1" style="display:none;">0 branches selected</span>
+                <span id="selected-branches-badge" class="badge badge-info my-1 ml-1" style="display:none;">0 branches
+                    selected</span>
             </div>
             <div class="d-flex align-items-center my-1">
-                <button id="btn-save-top" class="btn btn-sm btn-outline-success mr-2" style="display:none;" onclick="openSaveProjectModal()" title="Save Analysis to History">
+                <button id="btn-save-top" class="btn btn-sm btn-outline-success mr-2" style="display:none;"
+                    onclick="openSaveProjectModal()" title="Save Analysis to History">
                     <i class="fas fa-save mr-1"></i> Save Analysis
                 </button>
-                <button id="btn-export-csv" class="btn btn-sm btn-outline-success mr-2" onclick="exportSelectedBranchesCSV()" title="Export Cluster Labels as CSV">
+                <button id="btn-export-csv" class="btn btn-sm btn-outline-success mr-2"
+                    onclick="exportSelectedBranchesCSV()" title="Export Cluster Labels as CSV">
                     <i class="fas fa-download"></i> Export CSV
                 </button>
-                <button class="btn btn-sm btn-primary" onclick="openBatchConfigModal()"><i class="fas fa-layer-group"></i> Run Batch</button>
+                <button class="btn btn-sm btn-primary" onclick="openBatchConfigModal()"><i
+                        class="fas fa-layer-group"></i> Run Batch</button>
             </div>
         </div>
         <div class="card-body p-0">
@@ -52,7 +60,14 @@
     <div class="pane-bottom-container">
         <!-- Bottom Left: HAI Matrix -->
         <div class="pane pane-bottom-left card">
-            <div class="card-header"><i class="fas fa-th mr-1"></i> HAI Plot</div>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-th mr-1"></i> HAI Plot</span>
+                <select id="hai-scale-mode" class="form-control form-control-sm" style="width:auto; font-size:0.75rem;" title="HAI color scale">
+                    <option value="adaptive">Full adaptive range</option>
+                    <option value="robust">Robust contrast</option>
+                    <option value="fixed">Fixed 0–1</option>
+                </select>
+            </div>
             <div class="card-body p-0">
                 <div id="hai-heatmap" style="height: 400px; width: 100%;"></div>
             </div>
@@ -62,7 +77,8 @@
         <div class="pane pane-bottom-right card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="fas fa-chart-area mr-1"></i> Reachability Plots</span>
-                <span id="cache-indicator" class="badge badge-light border text-muted" style="font-size: 0.75rem;"></span>
+                <span id="cache-indicator" class="badge badge-light border text-muted"
+                    style="font-size: 0.75rem;"></span>
             </div>
             <div class="card-body p-0">
                 <!-- We will append multiple reachability plots here side-by-side -->
@@ -91,15 +107,21 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label>Dataset (CSV) <span class="required">*</span></label>
-                                <input type="file" class="form-control-file" name="file" required>
+                                <input type="file" class="form-control-file" name="file" {% if not sample_dataset %}required{% endif %}>
+                                {% if sample_dataset %}
+                                <input type="hidden" name="sample_dataset" value="{{ sample_dataset }}">
+                                <div class="alert alert-success py-2 mt-2 mb-0">
+                                    <i class="fas fa-database mr-1"></i> Sample dataset: <strong>{{ sample_dataset }}</strong>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label>Algorithm</label>
-                                <select class="form-control" name="algorithm">
-                                    <option value="hdbscan">HDBSCAN</option>
+                                <select class="form-control" name="algorithm" data-mustache-setting="algorithm">
                                     <option value="core-sg">Core-SG</option>
+                                    <option value="hdbscan">HDBSCAN</option>
                                 </select>
                             </div>
                         </div>
@@ -109,19 +131,22 @@
                         <div class="col-md-4">
                             <div class="form-group">
                                 <label>Min <code>mpts</code></label>
-                                <input type="number" class="form-control" name="min_mpts" value="2" min="2">
+                                <input type="number" class="form-control" name="min_mpts" value="2" min="2"
+                                    data-mustache-setting="min_mpts">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="form-group">
                                 <label>Max <code>mpts</code></label>
-                                <input type="number" class="form-control" name="max_mpts" value="50" min="2">
+                                <input type="number" class="form-control" name="max_mpts" value="50" min="2"
+                                    data-mustache-setting="max_mpts">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="form-group">
                                 <label>Step Size</label>
-                                <input type="number" class="form-control" name="step" value="2" min="1">
+                                <input type="number" class="form-control" name="step" value="2" min="1"
+                                    data-mustache-setting="step">
                             </div>
                         </div>
                     </div>
@@ -134,52 +159,57 @@
         </div>
     </div>
 </div>
+{% if sample_dataset %}
+<script>
+document.addEventListener('DOMContentLoaded', () => openBatchConfigModal());
+</script>
+{% endif %}
 {% if project_id %}
 <script>
-// Auto-load saved project when page opens with ?project_id=
-document.addEventListener('DOMContentLoaded', async () => {
-    const projectId = "{{ project_id }}";
-    if (!projectId) return;
+    // Auto-load saved project when page opens with ?project_id=
+    document.addEventListener('DOMContentLoaded', async () => {
+        const projectId = "{{ project_id }}";
+        if (!projectId) return;
 
-    // Show loading indicator
-    const dendroDiv = document.getElementById('meta-dendrogram');
-    if (dendroDiv) {
-        dendroDiv.innerHTML = '<div class="d-flex align-items-center justify-content-center h-100 text-muted"><i class="fas fa-spinner fa-spin mr-2"></i> Loading saved analysis...</div>';
-    }
+        // Show loading indicator
+        const dendroDiv = document.getElementById('meta-dendrogram');
+        if (dendroDiv) {
+            dendroDiv.innerHTML = '<div class="d-flex align-items-center justify-content-center h-100 text-muted"><i class="fas fa-spinner fa-spin mr-2"></i> Loading saved analysis...</div>';
+        }
 
-    try {
-        const res = await fetch(`/api/projects/${projectId}/data`);
-        if (!res.ok) throw new Error('Project not found');
-        const data = await res.json();
+        try {
+            const res = await fetch(`/api/projects/${projectId}/data`);
+            if (!res.ok) throw new Error('Project not found');
+            const data = await res.json();
 
-        const analysis = data.analysis || {};
-        const results = data.results || {};
-        const meta = data.metadata || {};
+            const analysis = data.analysis || {};
+            const results = data.results || {};
+            const meta = data.metadata || {};
 
-        // Restore analysis globals (accessed via main.js DOMContentLoaded scope)
-        // We dispatch a custom event that main.js listens for
-        const event = new CustomEvent('mustache:project-loaded', {
-            detail: { analysis, results, metadata: meta }
-        });
-        document.dispatchEvent(event);
+            // Restore analysis globals (accessed via main.js DOMContentLoaded scope)
+            // We dispatch a custom event that main.js listens for
+            const event = new CustomEvent('mustache:project-loaded', {
+                detail: { analysis, results, metadata: meta }
+            });
+            document.dispatchEvent(event);
 
-        // Update sidebar info
-        const projName = document.getElementById('proj-name');
-        const projTime = document.getElementById('proj-min-mpts');
-        if (projName) projName.innerText = meta.name || 'Loaded Project';
-        if (projTime) projTime.innerText = meta.mpts_min || '-';
+            // Update sidebar info
+            const projName = document.getElementById('proj-name');
+            const projTime = document.getElementById('proj-min-mpts');
+            if (projName) projName.innerText = meta.name || 'Loaded Project';
+            if (projTime) projTime.innerText = meta.mpts_min || '-';
 
-        // Reveal save buttons
-        const sidebarSaveBtn = document.getElementById('btn-sidebar-save');
-        if (sidebarSaveBtn) sidebarSaveBtn.style.display = 'inline-block';
-        const topSaveBtn = document.getElementById('btn-save-top');
-        if (topSaveBtn) topSaveBtn.style.display = 'inline-block';
+            // Reveal save buttons
+            const sidebarSaveBtn = document.getElementById('btn-sidebar-save');
+            if (sidebarSaveBtn) sidebarSaveBtn.style.display = 'inline-block';
+            const topSaveBtn = document.getElementById('btn-save-top');
+            if (topSaveBtn) topSaveBtn.style.display = 'inline-block';
 
-    } catch (err) {
-        console.error('Failed to load project:', err);
-        if (dendroDiv) dendroDiv.innerHTML = '<div class="text-danger p-3"><i class="fas fa-exclamation-triangle mr-2"></i> Failed to load saved project: ' + err.message + '</div>';
-    }
-});
+        } catch (err) {
+            console.error('Failed to load project:', err);
+            if (dendroDiv) dendroDiv.innerHTML = '<div class="text-danger p-3"><i class="fas fa-exclamation-triangle mr-2"></i> Failed to load saved project: ' + err.message + '</div>';
+        }
+    });
 </script>
 {% endif %}
 {% endblock %}

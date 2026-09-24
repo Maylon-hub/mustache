@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MustaCHE v2</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/LOGO.png') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/Mustache_Logo_SVG.svg') }}">
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <!-- Bootstrap CSS for Grid/Modals (using CDN for simplicity in replication) -->
@@ -29,10 +29,10 @@
                 <!-- Main Section -->
                 <div class="sidebar-section-title">Main</div>
                 <ul>
-                    <li><a href="#" onclick="openBatchConfigModal(); return false;"><i class="fas fa-chart-pie"></i>
+                    <li><a href="/datasets"><i class="fas fa-chart-pie"></i>
                             Datasets</a></li>
-                    ed <li><a href="/projects"><i class="fas fa-folder-open"></i> Projects &amp; History</a></li>
-                    <li><a href="#" onclick="return false;"><i class="fas fa-cog"></i> Global Settings</a></li>
+                    <li><a href="/projects"><i class="fas fa-folder-open"></i> Projects &amp; History</a></li>
+                    <li><a href="/settings"><i class="fas fa-cog"></i> Global Settings</a></li>
                 </ul>
 
                 <!-- Panels Section -->
@@ -86,7 +86,7 @@
                     <!-- Nav Logo -->
                     <i class="fas fa-bars"
                         style="font-size: 1.2rem; color: #95a5a6; margin-right: 15px; cursor: pointer;"></i>
-                    <img src="{{ url_for('static', filename='img/LOGO.png') }}" alt="MustaCHE Logo"
+                    <img src="{{ url_for('static', filename='img/Mustache_Logo_SVG.svg') }}" alt="MustaCHE Logo"
                         style="height: 35px;">
                 </div>
                 <div class="navbar-right d-flex align-items-center">
@@ -99,7 +99,7 @@
                     <a href="/projects" title="Projects &amp; History"
                         style="color: #95a5a6; font-size: 1.2rem; margin-right: 15px;"><i
                             class="fas fa-folder-open"></i></a>
-                    <a href="#" title="Settings" style="color: #95a5a6; font-size: 1.2rem; margin-right: 15px;"><i
+                    <a href="/settings" title="Settings" style="color: #95a5a6; font-size: 1.2rem; margin-right: 15px;"><i
                             class="fas fa-cog"></i></a>
                     <a href="#" title="About" onclick="openAboutModal(); return false;"
                         style="color: #95a5a6; font-size: 1.2rem;"><i class="fas fa-info-circle"></i></a>
@@ -135,7 +135,7 @@
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=2.0.2"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=2.0.4"></script>
 
     <script>
         // Modal Logic

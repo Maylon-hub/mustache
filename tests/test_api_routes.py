@@ -36,6 +36,54 @@ class TestIndexRoute:
         res = flask_client.get('/')
         assert b'<!DOCTYPE html>' in res.data or b'<html' in res.data
 
+    def test_referenced_brand_assets_exist(self, flask_client):
+        for path in (
+            '/static/img/Mustache_Logo_SVG.svg',
+            '/static/img/ufscar-logo.png',
+            '/static/img/newcastle-logo.png',
+            '/static/img/UA-EAC-COLOUR-REVERSE.svg',
+            '/static/img/jcu-logo.png',
+        ):
+            response = flask_client.get(path)
+            assert response.status_code == 200, f"Missing packaged asset: {path}"
+
+    def test_settings_links_are_functional(self, flask_client):
+        index_response = flask_client.get('/')
+        assert index_response.data.count(b'href="/settings"') >= 2
+        assert flask_client.get('/settings').status_code == 200
+
+
+class TestSampleDatasets:
+    def test_dataset_library_page(self, flask_client):
+        response = flask_client.get('/datasets')
+        assert response.status_code == 200
+        assert b'Iris' in response.data
+        assert b'Two Moons' in response.data
+
+    def test_iris_csv_download(self, flask_client):
+        response = flask_client.get('/api/datasets/iris/csv')
+        assert response.status_code == 200
+        assert response.mimetype == 'text/csv'
+        assert len(response.data.splitlines()) == 151
+
+    def test_unknown_dataset_returns_404(self, flask_client):
+        response = flask_client.get('/api/datasets/not-a-dataset/csv')
+        assert response.status_code == 404
+
+    def test_batch_accepts_sample_dataset_without_upload(self, flask_client):
+        response = flask_client.post('/batch', data={
+            'sample_dataset': 'iris',
+            'min_mpts': '5',
+            'max_mpts': '5',
+            'step': '1',
+            'metric': 'euclidean',
+            'algorithm': 'hdbscan',
+        })
+        assert response.status_code == 200
+        body = response.get_json()
+        assert '5' in body['results']
+        assert len(body['results']['5']['labels']) == 150
+
 
 class TestProjectsListAPI:
     def test_get_projects_returns_200(self, flask_client):

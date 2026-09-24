@@ -86,6 +86,9 @@ def run_meta_clustering(hai_matrix):
     Runs HDBSCAN on the HAI matrix (converted to distance).
     Returns labels and a linkage matrix (manually computed via scipy).
     """
+    if len(hai_matrix) == 1:
+        return [0], []
+
     distance_matrix = 1.0 - hai_matrix
     distance_matrix[distance_matrix < 0] = 0
     np.fill_diagonal(distance_matrix, 0)
