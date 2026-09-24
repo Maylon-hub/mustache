@@ -13,7 +13,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "Flask>=3.0.0",
-    "core-sg-mustache>=0.4.0",
+    "core-sg-mustache>=0.4.2",
     "numpy",
     "pandas",
     "scikit-learn",
