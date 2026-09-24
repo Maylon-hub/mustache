@@ -11,7 +11,9 @@ import numpy as np
 
 main = Blueprint('main', __name__)
 
-# Global state to store the latest batch session for dynamic dendrogram cuts
+# In-memory session store for local interactive GUI sessions (single-worker server).
+# Note: For multi-worker production deployments (e.g. gunicorn -w 4), session state
+# should be backed by a persistent key-value store like Redis or file-based caching.
 SESSION_DATA = {
     'meta_linkage': None,
     'hai_matrix': None,

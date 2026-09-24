@@ -31,8 +31,8 @@ In **MustaCHE v2**, the application has been completely re-engineered into a **1
 
 ### Prerequisites
 
-- **Python 3.11.0 (64-bit)** recommended for using pre-built wheels.
-- No C++ compilers or Visual Studio required for end users on Windows 64-bit when installing official pre-built wheels (`.whl`).
+- **Python >= 3.10** (tested on Python 3.10, 3.11, 3.12, 3.13).
+- Pre-built binary wheels (`.whl`) with native Cython acceleration (`core-sg-mustache>=0.4.2`) available for Windows 64-bit, Linux, and macOS—no C++ compiler or Visual Studio required for end users.
 
 ### 1. Create and Activate a Virtual Environment
 

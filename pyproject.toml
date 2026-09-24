@@ -14,11 +14,11 @@ requires-python = ">=3.10"
 dependencies = [
     "Flask>=3.0.0",
     "core-sg-mustache>=0.4.2",
-    "numpy",
-    "pandas",
-    "scikit-learn",
-    "scipy",
-    "plotly"
+    "numpy>=1.24,<3",
+    "pandas>=2.0",
+    "scikit-learn>=1.3",
+    "scipy>=1.10",
+    "plotly>=5.0"
 ]
 
 [project.scripts]

@@ -1,12 +1,17 @@
+# Environments
+.venv/
+.venv*/
+venv/
+ENV/
+env/
+*.venv
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
 build/
 develop-eggs/
 dist/
