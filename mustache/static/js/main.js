@@ -46,7 +46,10 @@ async function confirmSaveProjectMain() {
         const res = await fetch('/api/projects/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name })
+            body: JSON.stringify({
+                name,
+                selected_mpts: window.getSelectedMpts ? window.getSelectedMpts() : []
+            })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to save');
@@ -105,6 +108,51 @@ document.addEventListener('DOMContentLoaded', () => {
     let debounceRelayoutTimer = null;
     const clientCutCache = new Map();
 
+    window.getSelectedMpts = () => Array.from(selectedBranches).sort((a, b) => a - b);
+
+    function refreshBranchStyles() {
+        const dendroDiv = document.getElementById('meta-dendrogram');
+        if (!dendroDiv || !Array.isArray(dendroDiv.data)) return;
+        dendroDiv.data.forEach((trace, traceIndex) => {
+            const values = (trace.meta?.mpts_values || []).map(Number);
+            if (!values.length) return;
+            const selected = values.every(value => selectedBranches.has(value));
+            Plotly.restyle(dendroDiv, {
+                'line.color': selected ? '#28a745' : '#2196F3',
+                'line.width': selected ? 8 : 5,
+                opacity: selected ? 1 : 0.8
+            }, [traceIndex]);
+        });
+    }
+
+    function toggleBranch(trace) {
+        const values = (trace?.meta?.mpts_values || []).map(Number);
+        if (!values.length) return;
+        const remove = values.every(value => selectedBranches.has(value));
+        values.forEach(value => remove ? selectedBranches.delete(value) : selectedBranches.add(value));
+        updateSelectedBranchesBadge();
+        refreshBranchStyles();
+        if (latestAnalysis) latestAnalysis.selected_mpts = window.getSelectedMpts();
+    }
+
+    function attachBranchClickHandler(dendroDiv) {
+        if (!dendroDiv) return;
+        dendroDiv.removeAllListeners?.('plotly_click');
+        dendroDiv.on('plotly_click', (event) => {
+            if (currentDendroTool !== 'select') return;
+            const point = event?.points?.[0];
+            if (!point) return;
+            toggleBranch(point.data);
+        });
+    }
+
+    window.clearSelectedBranches = function() {
+        selectedBranches.clear();
+        if (latestAnalysis) latestAnalysis.selected_mpts = [];
+        updateSelectedBranchesBadge();
+        refreshBranchStyles();
+    };
+
     // Toolbar Tool Selection
     window.setDendroTool = function(mode) {
         currentDendroTool = mode;
@@ -130,7 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
             Plotly.relayout('meta-dendrogram', { dragmode: false });
         } else {
             // select mode
-            Plotly.relayout('meta-dendrogram', { dragmode: 'select' });
+            // Branches are selected by clicking their blue lines.
+            Plotly.relayout('meta-dendrogram', { dragmode: false });
         }
     };
 
@@ -215,12 +264,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateSelectedBranchesBadge() {
         const badge = document.getElementById('selected-branches-badge');
+        const clearButton = document.getElementById('btn-clear-selection');
         if (!badge) return;
         if (selectedBranches.size > 0) {
             badge.style.display = 'inline-block';
-            badge.innerText = `${selectedBranches.size} branch${selectedBranches.size > 1 ? 'es' : ''} selected`;
+            const values = window.getSelectedMpts();
+            badge.innerText = `${values.length} hierarch${values.length > 1 ? 'ies' : 'y'} selected: mpts ${values.join(', ')}`;
+            badge.title = 'These hierarchies will be saved with the project and exported to CSV.';
+            if (clearButton) clearButton.style.display = 'inline-block';
         } else {
             badge.style.display = 'none';
+            if (clearButton) clearButton.style.display = 'none';
         }
     }
 
@@ -319,30 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const dendroDiv = document.getElementById('meta-dendrogram');
 
-                    // Support branch selection click
-                    dendroDiv.on('plotly_click', (data) => {
-                        if (currentDendroTool !== 'select') return;
-                        if (!data || !data.points || data.points.length === 0) return;
-                        
-                        const pt = data.points[0];
-                        // If leaf point or label clicked, toggle selection
-                        let clickedMpts = null;
-                        if (pt.text && !isNaN(parseInt(pt.text))) {
-                            clickedMpts = parseInt(pt.text);
-                        } else if (pt.x !== undefined && pt.data && pt.data.text && pt.data.text[pt.pointIndex]) {
-                            const txt = pt.data.text[pt.pointIndex];
-                            if (!isNaN(parseInt(txt))) clickedMpts = parseInt(txt);
-                        }
-
-                        if (clickedMpts !== null) {
-                            if (selectedBranches.has(clickedMpts)) {
-                                selectedBranches.delete(clickedMpts);
-                            } else {
-                                selectedBranches.add(clickedMpts);
-                            }
-                            updateSelectedBranchesBadge();
-                        }
-                    });
+                    attachBranchClickHandler(dendroDiv);
 
                     // Relayout with Debounce & Quantized Height Interval Caching
                     dendroDiv.on('plotly_relayout', (eventData) => {
@@ -574,7 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
         latestAnalysis = analysis;
         batchResults = results;
         clientCutCache.clear();
-        selectedBranches.clear();
+        selectedBranches = new Set((analysis.selected_mpts || []).map(Number));
         currentMedoidsSignature = '';
         updateSelectedBranchesBadge();
 
@@ -620,6 +651,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Re-attach relayout handler so threshold dragging still works
             const dendroDiv2 = document.getElementById('meta-dendrogram');
             if (dendroDiv2) {
+                attachBranchClickHandler(dendroDiv2);
+                refreshBranchStyles();
                 dendroDiv2.on('plotly_relayout', (evData) => {
                     let newY = null;
                     if (evData['shapes[0].y0'] !== undefined) newY = evData['shapes[0].y0'];

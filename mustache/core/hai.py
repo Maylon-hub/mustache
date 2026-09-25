@@ -60,26 +60,134 @@ def compute_hai_score(D1, D2):
     return 1.0 - (total_diff / (n * n))
 
 
-def compute_hai_matrix(linkage_list, n_samples):
+def _build_lca_index(Z, n_samples):
+    """Build a binary-lifting index for LCA queries on a SciPy linkage tree."""
+    node_count = 2 * n_samples - 1
+    parent = np.full(node_count, -1, dtype=np.int64)
+    children = np.full((node_count, 2), -1, dtype=np.int64)
+    sizes = np.ones(node_count, dtype=np.float64)
+
+    for merge_index, row in enumerate(np.asarray(Z)):
+        node = n_samples + merge_index
+        left, right = int(row[0]), int(row[1])
+        children[node] = (left, right)
+        parent[left] = node
+        parent[right] = node
+        sizes[node] = float(row[3])
+
+    root = node_count - 1
+    parent[root] = root
+    depth = np.zeros(node_count, dtype=np.int64)
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        left, right = children[node]
+        if left >= 0:
+            depth[left] = depth[node] + 1
+            depth[right] = depth[node] + 1
+            stack.extend((left, right))
+
+    levels = max(1, int(np.ceil(np.log2(max(2, node_count)))) + 1)
+    ancestors = np.empty((levels, node_count), dtype=np.int64)
+    ancestors[0] = parent
+    for level in range(1, levels):
+        ancestors[level] = ancestors[level - 1][ancestors[level - 1]]
+    return ancestors, depth, sizes
+
+
+def _sampled_hierarchy_values(Z, n_samples, left_points, right_points):
+    """Return normalized LCA cluster sizes for a shared sample of point pairs."""
+    ancestors, depth, sizes = _build_lca_index(Z, n_samples)
+    left = np.asarray(left_points, dtype=np.int64).copy()
+    right = np.asarray(right_points, dtype=np.int64).copy()
+
+    swap = depth[left] < depth[right]
+    left[swap], right[swap] = right[swap].copy(), left[swap].copy()
+    depth_delta = depth[left] - depth[right]
+    for level in range(ancestors.shape[0]):
+        mask = ((depth_delta >> level) & 1).astype(bool)
+        left[mask] = ancestors[level, left[mask]]
+
+    different = left != right
+    for level in range(ancestors.shape[0] - 1, -1, -1):
+        move = different & (ancestors[level, left] != ancestors[level, right])
+        left[move] = ancestors[level, left[move]]
+        right[move] = ancestors[level, right[move]]
+
+    lca = left.copy()
+    lca[different] = ancestors[0, left[different]]
+    return (sizes[lca] / float(n_samples)).astype(np.float32)
+
+
+def compute_hai_matrix(
+    linkage_list,
+    n_samples,
+    *,
+    max_exact_samples=2000,
+    sample_pairs=50000,
+    random_state=42,
+    return_metadata=False,
+):
     """
     Computes the HAI matrix for a list of linkage structures.
     """
     n_hierarchies = len(linkage_list)
     hai_matrix = np.zeros((n_hierarchies, n_hierarchies))
     
-    d_matrices = [build_distance_matrix(Z, n_samples) for Z in linkage_list]
+    use_approximation = n_samples > max_exact_samples
+
+    if use_approximation:
+        pair_count = max(1, int(sample_pairs))
+        rng = np.random.default_rng(random_state)
+        left_points = rng.integers(0, n_samples, size=pair_count, dtype=np.int64)
+        right_points = rng.integers(0, n_samples - 1, size=pair_count, dtype=np.int64)
+        right_points += right_points >= left_points
+        hierarchy_values = [
+            _sampled_hierarchy_values(Z, n_samples, left_points, right_points)
+            for Z in linkage_list
+        ]
+        normalization = (n_samples - 1) / n_samples
+        # Hoeffding bound for a bounded [0, 1] mean, confidence 95%.
+        error_bound = normalization * np.sqrt(np.log(40.0) / (2.0 * pair_count))
+        method = 'sampled-pairs'
+    else:
+        triangle = np.triu_indices(n_samples, k=1)
+        hierarchy_values = [
+            build_distance_matrix(Z, n_samples)[triangle].astype(np.float32)
+            for Z in linkage_list
+        ]
+        normalization = 2.0 / (n_samples * n_samples)
+        pair_count = n_samples * (n_samples - 1) // 2
+        error_bound = 0.0
+        method = 'exact-condensed'
     
     for i in range(n_hierarchies):
         for j in range(i, n_hierarchies):
             if i == j:
                 score = 1.0
             else:
-                score = compute_hai_score(d_matrices[i], d_matrices[j])
+                if use_approximation:
+                    score = 1.0 - normalization * float(
+                        np.mean(np.abs(hierarchy_values[i] - hierarchy_values[j]))
+                    )
+                else:
+                    score = 1.0 - normalization * float(
+                        np.sum(np.abs(hierarchy_values[i] - hierarchy_values[j]), dtype=np.float64)
+                    )
             
             hai_matrix[i, j] = score
             hai_matrix[j, i] = score
             
-    return hai_matrix
+    metadata = {
+        'method': method,
+        'approximate': use_approximation,
+        'n_samples': int(n_samples),
+        'pair_count': int(pair_count),
+        'random_state': int(random_state) if use_approximation else None,
+        'confidence': 0.95 if use_approximation else 1.0,
+        'absolute_error_bound': float(error_bound),
+    }
+    return (hai_matrix, metadata) if return_metadata else hai_matrix
 
 def run_meta_clustering(hai_matrix):
     """

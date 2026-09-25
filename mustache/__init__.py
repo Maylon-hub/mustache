@@ -1,5 +1,12 @@
 import os
+from importlib.metadata import PackageNotFoundError, version
+
 from flask import Flask
+
+try:
+    __version__ = version("mustache-core")
+except PackageNotFoundError:  # Source checkout without an installed distribution.
+    __version__ = "0+unknown"
 
 def create_app():
     app = Flask(__name__)

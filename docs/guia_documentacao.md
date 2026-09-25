@@ -1,6 +1,8 @@
 # Guia de Documentação — MustaCHE v2
 
-**Pacote**: `mustache-core` v0.2.0**Backend**: `core-sg-mustache` v0.3.0 (Cython nativo)**Estilo deste guia**: [Read the Docs](https://www.sphinx-doc.org/) / [MkDocs](https://www.mkdocs.org/)
+**Código-fonte atual**: `mustache-core` v0.3.0rc1<br>
+**Backend mínimo**: `core-sg-mustache` v0.4.5rc1<br>
+**Estilo deste guia**: [Read the Docs](https://www.sphinx-doc.org/) / [MkDocs](https://www.mkdocs.org/)
 
 > Este documento serve como referência para usuários finais, orientadores e colaboradores que desejam **instalar, usar a API, interpretar saídas e operar a Web UI** do MustaCHE.
 
@@ -35,8 +37,8 @@ O **MustaCHE** (*Multiple Cluster Hierarchies Explorer*) é uma ferramenta inter
 ├─────────────────────────────────────────────────────────┤
 │            Motor Analítico (mustache.core)              │
 │            - run_clustering()                           │
-│            - stability_analysis()                       │
-│            - hierarchy_extraction()                     │
+│            - run_batch_clustering()                     │
+│            - analyze_batch_results()                    │
 ├─────────────────────────────────────────────────────────┤
 │               Backend Cython (core_sg)                  │
 │            - _mst_kruskal.pyd (MST em C otimizado)      │
@@ -50,8 +52,8 @@ O **MustaCHE** (*Multiple Cluster Hierarchies Explorer*) é uma ferramenta inter
 
 ### 2.1 Pré-requisitos
 
-- Python 3.11.0 (64-bit)
-- Windows 10/11 (para as wheels pré-compiladas atuais)
+- Python >= 3.10
+- Windows, Linux ou macOS com uma wheel compatível do backend
 - Conexão com Internet
 
 ### 2.2 Instalação via pip
@@ -67,18 +69,23 @@ pip install --upgrade pip
 # Instalar o MustaCHE (puxa core-sg-mustache automaticamente)
 pip install --index-url https://test.pypi.org/simple \
             --extra-index-url https://pypi.org/simple \
-            mustache-core==0.2.0
+            --pre mustache-core==0.3.0rc1
 ```
 
 ### 2.3 Verificação
 
 ```python
 import mustache
-print(mustache.__version__)  # Esperado: 0.2.0
+print(mustache.__version__)  # Esperado: 0.3.0rc1
 
 from mustache.core import run_clustering
 print("Backend Cython ativo")  # Sem erros = sucesso
 ```
+
+Para validar o uso em Jupyter, abra e execute todas as células de
+[`examples/mustache_quickstart.ipynb`](../examples/mustache_quickstart.ipynb). O notebook cria
+um conjunto sintético, executa uma varredura CORE-SG para `mpts = 4, 6, 8` e verifica a forma
+dos resultados.
 
 ---
 
@@ -90,13 +97,11 @@ print("Backend Cython ativo")  # Sem erros = sucesso
 from mustache.core import run_clustering
 
 result = run_clustering(
-    X,
-    method='hdbscan',
+    dataframe,
     min_cluster_size=5,
     min_samples=None,
-    match_reference_implementation=True,
-    core_dist_n_jobs=1,
-    random_state=None
+    metric='euclidean',
+    algorithm='core-sg'
 )
 ```
 
@@ -104,13 +109,12 @@ result = run_clustering(
 
 | Parâmetro | Tipo | Padrão | Descrição |
 | :--------------------------------- | :------------------ | :----------------- | :------------------------------------------------------------------------------------------------------------- |
-| `X` | `np.ndarray` | *(obrigatório)* | Matriz de dados de forma`(n_samples, n_features)` |
-| `method` | `str` | `'hdbscan'` | Método de clustering:`'hdbscan'` ou `'core_sg'` |
+| `dataframe` | `pandas.DataFrame` | *(obrigatório)* | Dados tabulares; apenas colunas numéricas são agrupadas |
+| `algorithm` | `str` | `'core-sg'` | Método de clustering: `'core-sg'` ou `'hdbscan'` |
 | `min_cluster_size` | `int` | `5` | Tamanho mínimo de um cluster |
 | `min_samples` | `int` ou `None` | `None` | Número mínimo de amostras em uma vizinhança (se`None`, usa `min_cluster_size`) |
-| `match_reference_implementation` | `bool` | `True` | Se`True`, usa o algoritmo de referência do HDBSCAN para reprodutibilidade |
-| `core_dist_n_jobs` | `int` | `1` | Número de jobs para computação de distância.`1` = single-thread (reprodutível); `-1` = todos os cores |
-| `random_state` | `int` ou `None` | `None` | Seed para reprodutibilidade |
+| `metric` | `str` | `'euclidean'` | Métrica aceita pelo backend selecionado |
+| `true_labels` | array ou `None` | `None` | Rótulos de referência opcionais para ARI e AMI |
 
 ### 3.3 Retorno
 
@@ -118,13 +122,14 @@ A função retorna um dicionário com as seguintes chaves:
 
 | Chave | Tipo | Descrição |
 | :---------------------- | :--------------------- | :----------------------------------------------------------- |
-| `labels` | `np.ndarray` (int) | Rótulos de cluster para cada amostra (`-1` indica ruído) |
-| `probabilities` | `np.ndarray` (float) | Probabilidade de cada amostra pertencer ao seu cluster |
-| `cluster_persistence` | `np.ndarray` (float) | Estabilidade/persistência de cada cluster encontrado |
-| `cluster_sizes` | `dict` | Mapeamento`label` $\rightarrow$ tamanho |
+| `labels` | `list[int]` | Rótulos de cluster para cada amostra (`-1` indica ruído) |
+| `probabilities` | `list[float]` | Probabilidade de cada amostra pertencer ao seu cluster |
 | `n_clusters` | `int` | Número de clusters encontrados (excluindo ruído) |
-| `hierarchy` | `list` (dict) | Estrutura hierárquica completa (dendrograma) |
-| `mst_edges` | `np.ndarray` | Arestas da Minimum Spanning Tree (se disponível) |
+| `noise_points` | `int` | Quantidade de amostras classificadas como ruído |
+| `linkage_z` | `list` | Matriz de linkage da hierarquia |
+| `metrics` | `dict` | ARI e AMI quando `true_labels` é fornecido |
+| `dendrogram_json`, `reachability_json`, `map_json` | `str` ou `None` | Figuras Plotly serializadas |
+| `clustering_time`, `optics_time` | `float` | Tempos observados, em segundos |
 
 ### 3.4 Exemplo mínimo
 
@@ -141,7 +146,7 @@ X = np.vstack([
 ])
 
 # Executar clustering
-result = run_clustering(X, method='hdbscan', min_cluster_size=10)
+result = run_clustering(pd.DataFrame(X), algorithm='hdbscan', min_cluster_size=10)
 
 print(f"Clusters encontrados: {result['n_clusters']}")
 print(f"Amostras rotuladas: {len(result['labels'])}")
@@ -164,21 +169,11 @@ print(f"Rótulos únicos: {np.unique(result['labels'])}")
 - Quanto mais próximo de 1, mais fortemente a amostra pertence ao seu cluster;
 - Útil para identificar amostras ambíguas (fronteira entre clusters).
 
-### 4.3 Persistência (`cluster_persistence`)
+### 4.3 Hierarquia (`linkage_z`)
 
-- Mede quanto um cluster persiste ao longo de diferentes escalas de densidade;
-- Valores altos indicam clusters robustos e bem separados;
-- Valores baixos indicam clusters instáveis ou transitórios.
-
-$$
-\text{persistência}(C) = \int_{\lambda_{\min}}^{\lambda_{\max}} \frac{|C \cap \text{cluster}_{\lambda}|}{|C|} \, d\lambda
-$$
-
-### 4.4 Hierarquia (`hierarchy`)
-
-- Lista de dicionários representando cada nível de corte da árvore hierárquica;
-- Cada nível contém: `lambda_value`, `clusters`, `parent`, `stability`;
-- Permite visualizar o dendrograma completo na Web UI.
+- Matriz SciPy de forma `(n_samples - 1, 4)` representando as fusões da árvore;
+- Cada linha contém os dois filhos, a distância da fusão e o tamanho do novo cluster;
+- É a representação usada pelo HAI e pelo dendrograma.
 
 ### 4.5 Exportando para CSV
 
@@ -215,7 +210,8 @@ O servidor será iniciado em: `http://localhost:5000`
 | **Hierarquias** | Visualizar dendrogramas interativos (Plotly + D3.js) |
 | **Estabilidade** | Heatmap de estabilidade de clusters vs.`mpts` |
 | **Comparação** | Comparar múltiplas hierarquias lado a lado |
-| **Exportar** | Baixar CSVs, JSONs e PNGs dos gráficos |
+| **Selecionar ramos** | Clicar numa subárvore para selecionar todos os valores de `mpts` abaixo dela |
+| **Exportar** | Baixar CSV com rótulos e probabilidades das hierarquias selecionadas |
 
 ### 5.3 Fluxo de uso típico
 
@@ -224,7 +220,8 @@ O servidor será iniciado em: `http://localhost:5000`
 3. Executar clustering
 4. Explorar hierarquias na aba "Hierarquias"
 5. Analisar estabilidade na aba "Estabilidade"
-6. Exportar resultados
+6. Clicar em ramos do meta-dendrograma para selecionar as hierarquias relevantes
+7. Salvar a análise ou exportar as partições selecionadas em CSV
 
 ---
 
@@ -236,18 +233,16 @@ O servidor será iniciado em: `http://localhost:5000`
 mustache --help
 ```
 
-### 6.2 Subcomandos
+### 6.2 Opções disponíveis
+
+O comando atual inicia a Web UI; ele não possui subcomandos de clustering.
 
 ```powershell
-# Executar clustering em um CSV
-mustache cluster dados.csv --method hdbscan --min-cluster-size 10
-
-# Gerar relatório de estabilidade
-mustache stability dados.csv --mpts-range 5 50 5
-
-# Iniciar a Web UI
-mustache serve --port 5000
+mustache --host 127.0.0.1 --port 5000
+mustache --help
 ```
+
+Para processamento sem servidor, importe `run_clustering` ou `run_batch_clustering` em um script ou notebook.
 
 ---
 
@@ -266,7 +261,7 @@ iris = load_iris()
 X = iris.data
 
 # Executar clustering
-result = run_clustering(X, method='hdbscan', min_cluster_size=5)
+result = run_clustering(pd.DataFrame(X), algorithm='hdbscan', min_cluster_size=5)
 
 # Exibir resultados
 print(f"Clusters: {result['n_clusters']}")
@@ -298,20 +293,19 @@ mpts_values = [5, 10, 15, 20, 30, 50]
 stability_results = []
 
 for mpts in mpts_values:
-    result = run_clustering(X, method='hdbscan',
+    result = run_clustering(pd.DataFrame(X), algorithm='hdbscan',
                             min_cluster_size=mpts,
-                            core_dist_n_jobs=1)
+                            min_samples=mpts)
     stability_results.append({
         'mpts': mpts,
         'n_clusters': result['n_clusters'],
-        'mean_persistence': np.mean(result['cluster_persistence'])
-            if len(result['cluster_persistence']) > 0 else 0.0
+        'noise_points': result['noise_points']
     })
 
 # Exibir tabela
 for r in stability_results:
     print(f"mpts={r['mpts']:>3} | clusters={r['n_clusters']} | "
-          f"persistência média={r['mean_persistence']:.3f}")
+          f"ruído={r['noise_points']}")
 ```
 
 ### 7.3 Visualização da hierarquia
@@ -323,39 +317,30 @@ import numpy as np
 
 # Gerar dados e executar clustering
 X = np.random.RandomState(42).randn(300, 2)
-result = run_clustering(X, method='hdbscan', min_cluster_size=10)
+result = run_clustering(pd.DataFrame(X), algorithm='hdbscan', min_cluster_size=10)
 
 # Extrair hierarquia
-hierarchy = result['hierarchy']
+hierarchy = np.asarray(result['linkage_z'])
 
 # Plotar dendrograma simplificado
-lambdas = [h['lambda_value'] for h in hierarchy]
-n_clusters = [len(h['clusters']) for h in hierarchy]
-
-fig = go.Figure(data=go.Scatter(x=lambdas, y=n_clusters, mode='lines+markers'))
-fig.update_layout(
-    title='Dendrograma: Clusters vs. Lambda',
-    xaxis_title='Lambda (1/distância)',
-    yaxis_title='Número de clusters'
-)
-fig.write_html('dendrograma.html')
-fig.show()
+from scipy.cluster.hierarchy import dendrogram
+dendrogram(hierarchy)
 ```
 
 ---
 
 ## 8. Perguntas Frequentes
 
-- **Por que preciso do Python 3.11 especificamente?**As wheels pré-compiladas publicadas no TestPyPI foram geradas para `cp311-win_amd64`. Outras versões do Python exigiriam recompilação (trabalho futuro via `cibuildwheel`).
+- **Qual versão do Python devo usar?** O projeto declara Python >= 3.10. Para a validação final, use uma versão que possua wheel publicada tanto para `mustache-core` quanto para `core-sg-mustache`.
 - **O que significa `match_reference_implementation=True`?**Garante que o algoritmo siga a implementação de referência do HDBSCAN original (Campello et al., 2013), assegurando reprodutibilidade entre diferentes máquinas e versões.
 - **Por que `core_dist_n_jobs=1` é recomendado?**Execuções paralelas podem introduzir não-determinismo na ordem de processamento de pontos equidistantes. Para reprodutibilidade científica, use 1.
 - **Como exportar a hierarquia para outro formato?**
-  A chave `hierarchy` do resultado é uma lista de dicionários Python, facilmente serializável em JSON:
+  A chave `linkage_z` é uma lista Python serializável em JSON:
 
 ```python
 import json
 with open('hierarquia.json', 'w') as f:
-    json.dump(result['hierarchy'], f, indent=2)
+    json.dump(result['linkage_z'], f, indent=2)
 ```
 
 - **Posso usar GPU para acelerar?**Atualmente, o backend Cython é CPU-only. Suporte a GPU está no roadmap futuro.
@@ -367,7 +352,7 @@ with open('hierarquia.json', 'w') as f:
   author  = {[autores]},
   year    = {2026},
   url     = {https://test.pypi.org/project/mustache-core/},
-  version = {0.2.0}
+  version = {0.3.0rc1}
 }
 ```
 
@@ -378,4 +363,4 @@ with open('hierarquia.json', 'w') as f:
 - Campello, R. J. G. B., et al. "Density-Based Clustering Based on Hierarchical Density Estimates." PAKDD 2013.
 - Documentação oficial do HDBSCAN: [https://hdbscan.readthedocs.io/](https://hdbscan.readthedocs.io/)
 - Core-SG (base do backend): [https://github.com/gabrieljorliano/core-sg](https://github.com/gabrieljorliano/core-sg)
-- MustaCHE no TestPyPI: [https://test.pypi.org/project/mustache-core/0.2.0/](https://test.pypi.org/project/mustache-core/0.2.0/)
+- MustaCHE no TestPyPI: [https://test.pypi.org/project/mustache-core/0.3.0rc1/](https://test.pypi.org/project/mustache-core/0.3.0rc1/)

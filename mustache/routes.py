@@ -79,6 +79,7 @@ def get_projects():
 def save_project_route():
     data = request.get_json() or {}
     name = data.get('name', 'My Analysis')
+    selected_mpts = [int(value) for value in data.get('selected_mpts', [])]
     
     results = SESSION_DATA.get('results')
     params = SESSION_DATA.get('params', {})
@@ -94,7 +95,9 @@ def save_project_route():
         'meta_labels': SESSION_DATA.get('meta_labels'),
         'medoids': SESSION_DATA.get('last_medoids'),
         'outliers': SESSION_DATA.get('outliers', []),
-        'meta_dendrogram_json': SESSION_DATA.get('meta_dendrogram_json')
+        'meta_dendrogram_json': SESSION_DATA.get('meta_dendrogram_json'),
+        'hai_computation': SESSION_DATA.get('hai_computation'),
+        'selected_mpts': selected_mpts
     }
     
     meta = storage.save_project(name, params, analysis, results, raw_df)
@@ -120,6 +123,8 @@ def get_project_data(project_id):
         SESSION_DATA['last_medoids'] = analysis.get('medoids', {})
         SESSION_DATA['outliers'] = analysis.get('outliers', [])
         SESSION_DATA['meta_dendrogram_json'] = analysis.get('meta_dendrogram_json')
+        SESSION_DATA['hai_computation'] = analysis.get('hai_computation')
+        SESSION_DATA['selected_mpts'] = analysis.get('selected_mpts', [])
         
         return jsonify({
             'metadata': data.get('metadata'),
@@ -250,6 +255,8 @@ def batch_process():
         SESSION_DATA['last_medoids'] = analysis.get('medoids')
         SESSION_DATA['outliers'] = analysis.get('outliers', [])
         SESSION_DATA['meta_dendrogram_json'] = analysis.get('meta_dendrogram_json')
+        SESSION_DATA['hai_computation'] = analysis.get('hai_computation')
+        SESSION_DATA['selected_mpts'] = []
         SESSION_DATA['results'] = results
         SESSION_DATA['raw_data'] = df
         SESSION_DATA['cut_cache'] = {}

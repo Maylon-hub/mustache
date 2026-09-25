@@ -156,3 +156,15 @@ class TestAnalyzeBatchResults:
         analysis = analyze_batch_results(self._run_batch(X))
         assert isinstance(analysis.get('outliers'), list)
         assert all(value in analysis['ordered_mpts'] for value in analysis['outliers'])
+
+    def test_meta_dendrogram_branches_identify_their_mpts(self, blobs_100):
+        import json
+        X, _ = blobs_100
+        analysis = analyze_batch_results(self._run_batch(X))
+        figure = json.loads(analysis['meta_dendrogram_json'])
+        branch_traces = [trace for trace in figure['data'] if trace.get('meta', {}).get('mpts_values')]
+        assert branch_traces
+        valid_mpts = set(analysis['ordered_mpts'])
+        for trace in branch_traces:
+            assert set(trace['meta']['mpts_values']).issubset(valid_mpts)
+        assert analysis['hai_computation']['method'] in {'exact-condensed', 'sampled-pairs'}

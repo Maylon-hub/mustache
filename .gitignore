@@ -2,6 +2,7 @@
 .venv/
 .venv*/
 venv/
+venv_*/
 ENV/
 env/
 *.venv
@@ -38,6 +39,7 @@ instance/
 # IDE
 .vscode/
 .idea/
+.agent/
 *.swp
 *.swo
 *~

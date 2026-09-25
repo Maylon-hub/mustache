@@ -54,11 +54,10 @@ def main():
     import sklearn
     time.sleep(0.15)
 
-    print_progress("Loading Clustering Engine (core-sg)...", 90, start_time)
-    try:
-        import core_sg
-    except ImportError:
-        pass
+    # Core-SG is imported lazily only when the user selects that algorithm.
+    # Importing it during CLI startup can trigger costly native/Numba initialization
+    # even when the user only wants HDBSCAN or the documentation pages.
+    print_progress("Registering lazy clustering backends...", 90, start_time)
     time.sleep(0.1)
 
     print_progress("Initializing application routes...", 98, start_time)

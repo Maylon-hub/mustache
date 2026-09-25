@@ -117,7 +117,9 @@ def analyze_batch_results(batch_results):
         
     # 1. Compute HAI Matrix (Pairwise similarity computation)
     t_hai_start = time.time()
-    hai_matrix = compute_hai_matrix(linkage_list, n_samples)
+    hai_matrix, hai_metadata = compute_hai_matrix(
+        linkage_list, n_samples, return_metadata=True
+    )
     hai_time = time.time() - t_hai_start
     
     # 2. Meta-Clustering
@@ -153,18 +155,39 @@ def analyze_batch_results(batch_results):
             dcoord = np.array(ddict['dcoord'])
             leaf_labels = ddict['ivl']
         
-        # Build one Scatter trace per branch (each row of icoord/dcoord is one U-shape)
-            traces = []
-            for xs, ys in zip(icoord.tolist(), dcoord.tolist()):
-                traces.append(go.Scatter(
-                    x=xs, y=ys, mode='lines',
-                    line=dict(color='#2196F3', width=2),
-                    hoverinfo='skip', showlegend=False
-                ))
-        
-        # X-axis tick positions: scipy places leaves at 5, 15, 25, ... (10 apart)
+            # X-axis tick positions: scipy places leaves at 5, 15, 25, ... (10 apart)
             n_leaves = len(leaf_labels)
             tick_vals = [10 * i + 5 for i in range(n_leaves)]
+
+            # Build one Scatter trace per branch (each row of icoord/dcoord is one U-shape)
+            traces = []
+            for branch_index, (xs, ys) in enumerate(zip(icoord.tolist(), dcoord.tolist())):
+                branch_min_x, branch_max_x = min(xs), max(xs)
+                branch_mpts = [
+                    int(label)
+                    for position, label in zip(tick_vals, leaf_labels)
+                    if branch_min_x <= position <= branch_max_x
+                ]
+                # Insert a point at the centre of the horizontal segment. Plotly
+                # click events are point-based, so this makes the visible branch
+                # reliably clickable without changing its geometry.
+                clickable_xs = [xs[0], xs[1], (xs[1] + xs[2]) / 2, xs[2], xs[3]]
+                clickable_ys = [ys[0], ys[1], ys[1], ys[2], ys[3]]
+                traces.append(go.Scatter(
+                    x=clickable_xs, y=clickable_ys, mode='lines+markers',
+                    line=dict(color='#2196F3', width=5),
+                    marker=dict(size=18, opacity=0),
+                    hovertemplate=(
+                        'Branch: mpts ' + ', '.join(map(str, branch_mpts)) +
+                        '<br>Merge distance: %{y:.6f}<extra></extra>'
+                    ),
+                    meta={
+                        'branch_id': branch_index,
+                        'mpts_values': branch_mpts,
+                        'merge_height': max(ys),
+                    },
+                    showlegend=False
+                ))
         
             layout = go.Layout(
                 template='plotly_white', title='Meta-Clustering Dendrogram (Hierarchies)',
@@ -216,6 +239,7 @@ def analyze_batch_results(batch_results):
         
     return {
         'hai_matrix': hai_matrix.tolist(),
+        'hai_computation': hai_metadata,
         'meta_labels': meta_labels,
         'meta_linkage': meta_linkage.tolist() if isinstance(meta_linkage, np.ndarray) else meta_linkage,
         'meta_dendrogram_json': meta_dendro_json,

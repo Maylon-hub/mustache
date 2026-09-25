@@ -1,7 +1,7 @@
 # MustaCHE (Multiple Cluster Hierarchies Explorer)
 
-![TestPyPI Version](https://img.shields.io/badge/TestPyPI-mustache--core%20v0.2.0-blue)
-![Backend Version](https://img.shields.io/badge/backend-core--sg--mustache%20v0.3.0-green)
+![TestPyPI Version](https://img.shields.io/badge/TestPyPI-mustache--core%20v0.3.0rc1-blue)
+![Backend Version](https://img.shields.io/badge/backend-core--sg--mustache%20v0.4.5rc1-green)
 ![Python Version](https://img.shields.io/badge/python-3.11-blue)
 ![Platform](https://img.shields.io/badge/platform-win__amd64-lightgrey)
 
@@ -21,7 +21,8 @@ In **MustaCHE v2**, the application has been completely re-engineered into a **1
   - **Meta-Clustering Dendrogram**: Hierarchically cluster different parameter configurations with dynamic cut thresholding.
   - **HAI Similarity Matrix**: Visualizes structural agreement between clustering partitions across parameter ranges.
   - **Reachability Plot**: Highlights density valleys corresponding to physical clusters.
-  - **2D Projection Scatter Map**: Spatial projection powered by t-SNE / UMAP.
+  - **2D Projection Scatter Map**: Spatial projection powered by t-SNE (single-analysis API responses).
+  - **Manual Branch Selection**: Click a meta-dendrogram branch to select every `mpts` hierarchy below it, then save the selection with the project or export those partitions to CSV.
 - **CLI & Web Dashboard**: Run with a single command (`mustache`) or import functions directly into Python scripts and Jupyter Notebooks.
 - **Ground Truth Validation**: Support for external label files to calculate Adjusted Rand Index (ARI) and Adjusted Mutual Information (AMI).
 
@@ -32,7 +33,7 @@ In **MustaCHE v2**, the application has been completely re-engineered into a **1
 ### Prerequisites
 
 - **Python >= 3.10** (tested on Python 3.10, 3.11, 3.12, 3.13).
-- Pre-built binary wheels (`.whl`) with native Cython acceleration (`core-sg-mustache>=0.4.2`) available for Windows 64-bit, Linux, and macOS—no C++ compiler or Visual Studio required for end users.
+- Pre-built binary wheels (`.whl`) with native Cython acceleration (`core-sg-mustache>=0.4.5rc1`) available for Windows 64-bit, Linux, and macOS—no C++ compiler or Visual Studio required for end users.
 
 ### 1. Create and Activate a Virtual Environment
 
@@ -90,10 +91,10 @@ python -m pip install --upgrade pip
 
 A single `pip install` command installs MustaCHE along with all required dependencies—including the **`core-sg-mustache`** backend engine, Flask, NumPy, Pandas, Scikit-Learn, Scipy, HDBSCAN, and Plotly. **End users do not need to install `core-sg-mustache` separately.**
 
-- **From TestPyPI (Current release v0.2.0)**:
+- **From TestPyPI (release candidate v0.3.0rc1)**:
 
   ```bash
-  pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ mustache-core==0.2.0
+  pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --pre mustache-core==0.3.0rc1
   ```
 
 - **From PyPI (Official release)**:
@@ -217,6 +218,8 @@ If you are developing locally or contributing to the codebase, follow these step
 
 You can import MustaCHE algorithms directly into your Python scripts or Jupyter Notebooks:
 
+An executable example is available at [`examples/mustache_quickstart.ipynb`](examples/mustache_quickstart.ipynb).
+
 ```python
 import pandas as pd
 from mustache.core import run_clustering
@@ -244,7 +247,7 @@ batch_results = run_batch_clustering(
     metric="euclidean", 
     algorithm="core-sg"
 )
-print(f"Processed {len(batch_results['results'])} hierarchies.")
+print(f"Processed {len(batch_results)} hierarchies.")
 ```
 
 ---
@@ -269,11 +272,19 @@ print(f"Processed {len(batch_results['results'])} hierarchies.")
 ### 4. Batch Analysis
 
 - In the **Batch Analysis** section, define a range of $m_{pts}$ values (`Min`, `Max`, `Step`).
-- MustaCHE runs the hierarchy sweep, calculates the HAI similarity matrix, builds the meta-clustering dendrogram, and caches the reachability plots.
+- MustaCHE runs the hierarchy sweep, calculates the HAI similarity matrix, builds the meta-clustering dendrogram, and prepares the reachability plots.
+- HAI is exact up to 2,000 samples. Above that threshold, MustaCHE uses a deterministic sample of point pairs and reports the method, seed, pair count, confidence, and conservative error bound in `analysis['hai_computation']`.
 
-### 5. Export Results
+### 5. Select, Save, and Export Branches
 
-- Click **"Export JSON"** to download metrics, cluster labels, and chart data.
+- Activate the wand tool and click a blue branch in the meta-dendrogram. Every leaf (`mpts`) below that branch is selected and the branch turns green.
+- Click the same branch again to remove those hierarchies, or use **Clear selection**.
+- **Save Analysis** preserves the selected `mpts` values in the saved project.
+- **Export CSV** exports the selected hierarchies. With no manual selection, it exports the active medoids.
+
+### 6. Export Results
+
+- Click **Export CSV** to download the input data together with cluster labels and membership probabilities for the selected hierarchies.
 
 ---
 

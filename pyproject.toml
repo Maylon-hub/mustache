@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mustache-core"
-version = "0.3.0"
+version = "0.3.0rc1"
 description = "MustaCHE (Multiple Cluster Hierarchies Explorer) integrated with pre-compiled Core-SG"
 authors = [
     {name = "Maylon Martins de Melo", email = "maylonmmartins@estudante.ufscar.br"},
@@ -13,7 +13,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "Flask>=3.0.0",
-    "core-sg-mustache>=0.4.2",
+    "core-sg-mustache>=0.4.5rc1",
     "numpy>=1.24,<3",
     "pandas>=2.0",
     "scikit-learn>=1.3",
