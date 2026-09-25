@@ -135,6 +135,28 @@ Once started, open your web browser and navigate to:
 
 ---
 
+## 🖼️ Interface and workflow
+
+MustaCHE is organized around a short exploratory workflow: choose a dataset, run a parameter
+batch, inspect the meta-dendrogram/HAI/reachability views, then save or export the relevant
+hierarchies.
+
+**1. Choose a reproducible sample dataset or upload a CSV.**
+
+![Dataset catalogue with built-in and synthetic datasets](docs/img/datasets.png)
+
+**2. Run a batch and explore its coordinated visualizations.** The upper chart is the
+meta-dendrogram; the HAI heat map and reachability plots below provide complementary evidence
+when comparing parameter configurations.
+
+![Batch-analysis dashboard with dendrogram, HAI, and reachability plots](docs/img/mustache-dashboard-teste.png)
+
+**3. Save an analysis and reopen it later without recomputing the batch.**
+
+![Saved projects and history screen](docs/img/mustache-projects.png)
+
+---
+
 ## 🛠️ Local Development Setup (From Source Code)
 
 If you are developing locally or contributing to the codebase, follow these steps to run MustaCHE directly from source without Docker.
@@ -277,7 +299,8 @@ print(f"Processed {len(batch_results)} hierarchies.")
 
 ### 5. Select, Save, and Export Branches
 
-- Activate the wand tool and click a blue branch in the meta-dendrogram. Every leaf (`mpts`) below that branch is selected and the branch turns green.
+- Run a batch first. In the dendrogram toolbar, activate the blue **wand** (the first tool; it is active by default). Do not leave the cut-line or hand/pan tool selected.
+- Click a **blue line segment** of a meta-dendrogram branch, rather than an axis label or the dotted cut line. Every leaf (`mpts`) below that branch is selected, the branch turns green, and a badge lists the selected values.
 - Click the same branch again to remove those hierarchies, or use **Clear selection**.
 - **Save Analysis** preserves the selected `mpts` values in the saved project.
 - **Export CSV** exports the selected hierarchies. With no manual selection, it exports the active medoids.

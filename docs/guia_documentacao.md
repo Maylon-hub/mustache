@@ -8,19 +8,6 @@
 
 ---
 
-## Sumário
-
-1. [Visão Geral](#1-visão-geral)
-2. [Instalação](#2-instalação)
-3. [API Reference — `run_clustering`](#3-api-reference--run_clustering)
-4. [Interpretando os Resultados](#4-interpretando-os-resultados)
-5. [Web UI — Interface Interativa](#5-web-ui--interface-interativa)
-6. [CLI — Linha de Comando](#6-cli--linha-de-comando)
-7. [Exemplos Completos](#7-exemplos-completos)
-8. [Perguntas Frequentes](#8-perguntas-frequentes)
-
----
-
 ## 1. Visão Geral
 
 O **MustaCHE** (*Multiple Cluster Hierarchies Explorer*) é uma ferramenta interativa, baseada na web, para explorar clustering hierárquico baseado em densidade. Ele permite analisar **múltiplas hierarquias de clustering** geradas sob uma ampla faixa de parâmetros de densidade (`mpts`) simultaneamente, oferecendo insights sobre:
@@ -83,7 +70,7 @@ print("Backend Cython ativo")  # Sem erros = sucesso
 ```
 
 Para validar o uso em Jupyter, abra e execute todas as células de
-[`examples/mustache_quickstart.ipynb`](../examples/mustache_quickstart.ipynb). O notebook cria
+[`examples/mustache_quickstart.ipynb`](https://github.com/Maylon-hub/mustache/blob/mustache-core-sg/examples/mustache_quickstart.ipynb). O notebook cria
 um conjunto sintético, executa uma varredura CORE-SG para `mpts = 4, 6, 8` e verifica a forma
 dos resultados.
 

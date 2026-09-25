@@ -266,11 +266,19 @@ três razões:
   \item \textbf{Relevância para o MustaCHE v2:} O MustaCHE modernizado utiliza o HDBSCAN como
         motor de clustering, tornando essa comparação diretamente aplicável ao caso de uso real
         da ferramenta.
-  \item \textbf{Superioridade do CORE-SG sobre o RNG já estabelecida:} O artigo original do
-        CORE-SG \cite{naldi2022coresg} já demonstra empiricamente que o CORE-SG é centenas a
-        milhares de vezes mais rápido que o RNG em diversos cenários. Portanto, a superioridade
-        do CORE-SG sobre o RNG não precisa ser revalidada neste trabalho.
+  \item \textbf{Superioridade do CORE-SG sobre o RNG já estabelecida:} o artigo original do
+        CORE-SG \cite{naldi2022coresg} demonstra, teórica e empiricamente, ganhos de centenas
+        a milhares de vezes no cálculo de MSTs baseadas em densidade frente à estratégia baseada
+        em RNG, em seus cenários experimentais. Portanto, esta IC não replica essa comparação
+        já publicada nem reivindica uma nova demonstração de superioridade sobre o RNG.
 \end{enumerate}
+
+Assim, o resultado publicado por Naldi et al. é adotado como fundamentação para a substituição
+do motor legado. A avaliação experimental desta IC concentra-se no que é específico desta
+implementação: a correção da integração do grafo de suporte, o desempenho do processamento em
+lote frente ao HDBSCAN canônico efetivamente disponibilizado no MustaCHE v2, a reprodutibilidade
+do pacote e a usabilidade das visualizações. Essa delimitação evita atribuir ao projeto uma
+responsabilidade de validação que pertence ao estudo de referência.
 
 A ativação do parâmetro \texttt{match\_reference\_implementation=True} desativa as heurísticas
 de aproximação rápida (árvore de Boruvka/KDTree) e força a construção da MST exata, tornando o
@@ -359,13 +367,30 @@ ambientes virtuais e por testes automatizados; a imagem Docker legada não integ
 entrega atual.
 
 A Figura~\ref{fig:dashboard} ilustra a interface principal do MustaCHE v2, com os resultados do
-processamento em lote e as visualizações coordenadas.
+processamento em lote e as visualizações coordenadas. A Figura~\ref{fig:datasets} mostra a etapa
+anterior de escolha de conjuntos de dados reproduzíveis, enquanto a Figura~\ref{fig:projects}
+mostra a persistência e a reabertura das análises, completando o fluxo de uso da ferramenta.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.95\textwidth]{mustache-dashboard.png}
-  \caption{Interface principal do MustaCHE v2 com resultados do processamento em lote.}
+  \includegraphics[width=0.95\textwidth]{img/mustache-dashboard-teste.png}
+  \caption{Interface principal do MustaCHE v2 após processamento em lote: meta-dendrograma,
+           matriz HAI e gráficos de acessibilidade.}
   \label{fig:dashboard}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{img/datasets.png}
+  \caption{Catálogo de conjuntos de dados de exemplo e sintéticos, com opção de envio de CSV.}
+  \label{fig:datasets}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{img/mustache-projects.png}
+  \caption{Histórico local de projetos salvos, com metadados e reabertura sem recomputação.}
+  \label{fig:projects}
 \end{figure}
 
 \subsection{Integração do CORE-SG e Correção do Vício de Integração}
@@ -666,8 +691,8 @@ para ferramentas de análise visual.
 A comparação com o HDBSCAN canônico (em vez do RNG originalmente proposto) mostrou-se
 academicamente mais rigorosa, pois alinha os resultados à literatura de referência (Campello
 et al., 2013/2015) e reflete o motor de clustering efetivamente utilizado pelo MustaCHE v2. A
-superioridade do Core-SG sobre o RNG já está estabelecida na literatura (Naldi et al., 2022),
-tornando desnecessária sua revalidação neste trabalho.
+superioridade do Core-SG sobre o RNG no cálculo de múltiplas MSTs já está estabelecida no estudo
+de Naldi et al. (2022); logo, sua revalidação direta não integra o escopo desta IC.
 
 Entre as limitações e sugestões para trabalhos futuros, destacam-se: (i) a necessidade de
 otimizar a transição entre cKDTree e PyNNDescent para melhorar o desempenho em cenários de
@@ -684,8 +709,10 @@ resultados a veículos científicos da área, como o Congresso de Iniciação Ci
 % ---------------------------------------------------------------------
 % 8. REFERÊNCIAS BIBLIOGRÁFICAS
 % ---------------------------------------------------------------------
+\renewcommand{\bibsection}{\section*{Referências}}
+\addcontentsline{toc}{section}{Referências}
 \bibliographystyle{abntex2-alf}
-\bibliography{referencias}
+\bibliography{file}
 
 % ---------------------------------------------------------------------
 % 9. PRODUÇÃO TÉCNICO-CIENTÍFICA

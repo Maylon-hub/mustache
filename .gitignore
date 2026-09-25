@@ -65,6 +65,7 @@ workspace/
 *.tmp
 temp/
 tmp/
+.mkdocs-check/
 
 # OS
 Thumbs.db
