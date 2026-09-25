@@ -18,7 +18,18 @@
 \onehalfspacing
 
 % ------------------------- CITAÇÕES ABNT -----------------------------
-\usepackage[alf,abnt-etal-list=2,abnt-etal-cite=3,abnt-emphasize=bf]{abntex2cite}
+% biblatex-abnt é compatível com a classe article e com versões atuais
+% do TeX Live. O processamento da bibliografia deve usar Biber.
+\usepackage[
+  backend=biber,
+  style=abnt,
+  language=auto,
+  autolang=other,
+  giveninits=true,
+  maxcitenames=3,
+  maxbibnames=99
+]{biblatex}
+\addbibresource{file.bib}
 
 % ------------------------- FIGURAS E TABELAS -------------------------
 \usepackage{graphicx}
@@ -171,7 +182,7 @@ Originalmente, o MustaCHE utilizava a técnica RNG-HDBSCAN* \cite{neto2017effici
 substitui o grafo completo por um grafo de vizinhança relativa (RNG), reduzindo o custo
 computacional.
 
-Mais recentemente, \citeonline{naldi2022coresg} propuseram o \textbf{CORE-SG}, uma estrutura
+Mais recentemente, \textcite{naldi2022coresg} propuseram o \textbf{CORE-SG}, uma estrutura
 de grafo que permite a computação eficiente de múltiplas MSTs para métodos baseados em
 densidade. O CORE-SG é construído a partir da união de apenas dois grafos: a MST calculada
 para o maior valor de \textit{mpts} do intervalo ($k_{max}$) e o grafo de $k_{max}$ vizinhos
@@ -260,8 +271,8 @@ três razões:
 
 \begin{enumerate}
   \item \textbf{Alinhamento com a literatura:} O HDBSCAN canônico implementa exatamente os
-        algoritmos de Prim/Kruskal exatos descritos por \citeonline{campello2013framework} e
-        \citeonline{campello2015hierarchical}, garantindo 100\% de fidelidade aos resultados
+        algoritmos de Prim/Kruskal exatos descritos por \textcite{campello2013framework} e
+        \textcite{campello2015hierarchical}, garantindo 100\% de fidelidade aos resultados
         teóricos publicados.
   \item \textbf{Relevância para o MustaCHE v2:} O MustaCHE modernizado utiliza o HDBSCAN como
         motor de clustering, tornando essa comparação diretamente aplicável ao caso de uso real
@@ -301,7 +312,7 @@ run\_clustering}).
 
 \subsubsection{Fase 2 -- Integração do CORE-SG}
 
-A integração do CORE-SG seguiu a fundamentação teórica de \citeonline{naldi2022coresg}. A
+A integração do CORE-SG seguiu a fundamentação teórica de \textcite{naldi2022coresg}. A
 construção do grafo de suporte é realizada uma única vez com o valor máximo de vizinhança
 $k_{max} = \max(mpts)$; as hierarquias subsequentes para qualquer $k \le k_{max}$ são obtidas
 por reponderação das arestas e extração da MST sobre o grafo já construído. No processamento em
@@ -671,7 +682,7 @@ tecnológica e criou a base necessária para a integração do CORE-SG. A corre�
 integração --- reutilizando o grafo de suporte em conformidade com a teoria --- proporcionou um
 ganho de 3,13x no processamento em lote para 500 amostras e demonstrou que as extrações
 subsequentes de MSTs passaram a custar milissegundos, validando empiricamente a fundamentação
-de \citeonline{naldi2022coresg}.
+de \textcite{naldi2022coresg}.
 
 As otimizações de visualização (pré-computação do OPTICS) reduziram em 91\% o tempo do
 componente mais custoso do pipeline, deslocando o gargalo para o clustering em lote, como
@@ -709,10 +720,7 @@ resultados a veículos científicos da área, como o Congresso de Iniciação Ci
 % ---------------------------------------------------------------------
 % 8. REFERÊNCIAS BIBLIOGRÁFICAS
 % ---------------------------------------------------------------------
-\renewcommand{\bibsection}{\section*{Referências}}
-\addcontentsline{toc}{section}{Referências}
-\bibliographystyle{abntex2-alf}
-\bibliography{file}
+\printbibliography[heading=bibintoc,title={Referências}]
 
 % ---------------------------------------------------------------------
 % 9. PRODUÇÃO TÉCNICO-CIENTÍFICA
