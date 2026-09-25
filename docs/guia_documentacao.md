@@ -1,8 +1,6 @@
 # Guia de Documentação — MustaCHE v2
 
-**Pacote**: `mustache-core` v0.2.0  
-**Backend**: `core-sg-mustache` v0.3.0 (Cython nativo)  
-**Estilo deste guia**: [Read the Docs](https://www.sphinx-doc.org/) / [MkDocs](https://www.mkdocs.org/)
+**Pacote**: `mustache-core` v0.2.0**Backend**: `core-sg-mustache` v0.3.0 (Cython nativo)**Estilo deste guia**: [Read the Docs](https://www.sphinx-doc.org/) / [MkDocs](https://www.mkdocs.org/)
 
 > Este documento serve como referência para usuários finais, orientadores e colaboradores que desejam **instalar, usar a API, interpretar saídas e operar a Web UI** do MustaCHE.
 
@@ -105,13 +103,13 @@ result = run_clustering(
 ### 3.2 Parâmetros
 
 | Parâmetro | Tipo | Padrão | Descrição |
-| :--- | :--- | :--- | :--- |
-| `X` | `np.ndarray` | *(obrigatório)* | Matriz de dados de forma `(n_samples, n_features)` |
-| `method` | `str` | `'hdbscan'` | Método de clustering: `'hdbscan'` ou `'core_sg'` |
+| :--------------------------------- | :------------------ | :----------------- | :------------------------------------------------------------------------------------------------------------- |
+| `X` | `np.ndarray` | *(obrigatório)* | Matriz de dados de forma`(n_samples, n_features)` |
+| `method` | `str` | `'hdbscan'` | Método de clustering:`'hdbscan'` ou `'core_sg'` |
 | `min_cluster_size` | `int` | `5` | Tamanho mínimo de um cluster |
-| `min_samples` | `int` ou `None` | `None` | Número mínimo de amostras em uma vizinhança (se `None`, usa `min_cluster_size`) |
-| `match_reference_implementation` | `bool` | `True` | Se `True`, usa o algoritmo de referência do HDBSCAN para reprodutibilidade |
-| `core_dist_n_jobs` | `int` | `1` | Número de jobs para computação de distância. `1` = single-thread (reprodutível); `-1` = todos os cores |
+| `min_samples` | `int` ou `None` | `None` | Número mínimo de amostras em uma vizinhança (se`None`, usa `min_cluster_size`) |
+| `match_reference_implementation` | `bool` | `True` | Se`True`, usa o algoritmo de referência do HDBSCAN para reprodutibilidade |
+| `core_dist_n_jobs` | `int` | `1` | Número de jobs para computação de distância.`1` = single-thread (reprodutível); `-1` = todos os cores |
 | `random_state` | `int` ou `None` | `None` | Seed para reprodutibilidade |
 
 ### 3.3 Retorno
@@ -119,11 +117,11 @@ result = run_clustering(
 A função retorna um dicionário com as seguintes chaves:
 
 | Chave | Tipo | Descrição |
-| :--- | :--- | :--- |
+| :---------------------- | :--------------------- | :----------------------------------------------------------- |
 | `labels` | `np.ndarray` (int) | Rótulos de cluster para cada amostra (`-1` indica ruído) |
 | `probabilities` | `np.ndarray` (float) | Probabilidade de cada amostra pertencer ao seu cluster |
 | `cluster_persistence` | `np.ndarray` (float) | Estabilidade/persistência de cada cluster encontrado |
-| `cluster_sizes` | `dict` | Mapeamento `label` $\rightarrow$ tamanho |
+| `cluster_sizes` | `dict` | Mapeamento`label` $\rightarrow$ tamanho |
 | `n_clusters` | `int` | Número de clusters encontrados (excluindo ruído) |
 | `hierarchy` | `list` (dict) | Estrutura hierárquica completa (dendrograma) |
 | `mst_edges` | `np.ndarray` | Arestas da Minimum Spanning Tree (se disponível) |
@@ -172,7 +170,9 @@ print(f"Rótulos únicos: {np.unique(result['labels'])}")
 - Valores altos indicam clusters robustos e bem separados;
 - Valores baixos indicam clusters instáveis ou transitórios.
 
-$$\text{persistência}(C) = \int_{\lambda_{\min}}^{\lambda_{\max}} \frac{|C \cap \text{cluster}_{\lambda}|}{|C|} \, d\lambda$$
+$$
+\text{persistência}(C) = \int_{\lambda_{\min}}^{\lambda_{\max}} \frac{|C \cap \text{cluster}_{\lambda}|}{|C|} \, d\lambda
+$$
 
 ### 4.4 Hierarquia (`hierarchy`)
 
@@ -209,11 +209,11 @@ O servidor será iniciado em: `http://localhost:5000`
 ### 5.2 Funcionalidades da Web UI
 
 | Aba | Funcionalidade |
-| :--- | :--- |
+| :--------------------- | :--------------------------------------------------- |
 | **Upload** | Carregar CSV com dados tabulares |
-| **Parâmetros** | Configurar `mpts`, `min_cluster_size`, método |
+| **Parâmetros** | Configurar`mpts`, `min_cluster_size`, método |
 | **Hierarquias** | Visualizar dendrogramas interativos (Plotly + D3.js) |
-| **Estabilidade** | Heatmap de estabilidade de clusters vs. `mpts` |
+| **Estabilidade** | Heatmap de estabilidade de clusters vs.`mpts` |
 | **Comparação** | Comparar múltiplas hierarquias lado a lado |
 | **Exportar** | Baixar CSVs, JSONs e PNGs dos gráficos |
 
@@ -346,16 +346,10 @@ fig.show()
 
 ## 8. Perguntas Frequentes
 
-- **Por que preciso do Python 3.11 especificamente?**  
-  As wheels pré-compiladas publicadas no TestPyPI foram geradas para `cp311-win_amd64`. Outras versões do Python exigiriam recompilação (trabalho futuro via `cibuildwheel`).
-
-- **O que significa `match_reference_implementation=True`?**  
-  Garante que o algoritmo siga a implementação de referência do HDBSCAN original (Campello et al., 2013), assegurando reprodutibilidade entre diferentes máquinas e versões.
-
-- **Por que `core_dist_n_jobs=1` é recomendado?**  
-  Execuções paralelas podem introduzir não-determinismo na ordem de processamento de pontos equidistantes. Para reprodutibilidade científica, use 1.
-
-- **Como exportar a hierarquia para outro formato?**  
+- **Por que preciso do Python 3.11 especificamente?**As wheels pré-compiladas publicadas no TestPyPI foram geradas para `cp311-win_amd64`. Outras versões do Python exigiriam recompilação (trabalho futuro via `cibuildwheel`).
+- **O que significa `match_reference_implementation=True`?**Garante que o algoritmo siga a implementação de referência do HDBSCAN original (Campello et al., 2013), assegurando reprodutibilidade entre diferentes máquinas e versões.
+- **Por que `core_dist_n_jobs=1` é recomendado?**Execuções paralelas podem introduzir não-determinismo na ordem de processamento de pontos equidistantes. Para reprodutibilidade científica, use 1.
+- **Como exportar a hierarquia para outro formato?**
   A chave `hierarchy` do resultado é uma lista de dicionários Python, facilmente serializável em JSON:
 
 ```python
@@ -364,10 +358,9 @@ with open('hierarquia.json', 'w') as f:
     json.dump(result['hierarchy'], f, indent=2)
 ```
 
-- **Posso usar GPU para acelerar?**  
-  Atualmente, o backend Cython é CPU-only. Suporte a GPU está no roadmap futuro.
+- **Posso usar GPU para acelerar?**Atualmente, o backend Cython é CPU-only. Suporte a GPU está no roadmap futuro.
+- **Como citar o MustaCHE?**
 
-- **Como citar o MustaCHE?**  
 ```bibtex
 @software{mustache2026,
   title   = {MustaCHE: Multiple Cluster Hierarchies Explorer},
@@ -383,6 +376,6 @@ with open('hierarquia.json', 'w') as f:
 ## Referências
 
 - Campello, R. J. G. B., et al. "Density-Based Clustering Based on Hierarchical Density Estimates." PAKDD 2013.
-- Documentação oficial do HDBSCAN: <https://hdbscan.readthedocs.io/>
-- Core-SG (base do backend): <https://github.com/gabrieljorliano/core-sg>
-- MustaCHE no TestPyPI: <https://test.pypi.org/project/mustache-core/0.2.0/>
+- Documentação oficial do HDBSCAN: [https://hdbscan.readthedocs.io/](https://hdbscan.readthedocs.io/)
+- Core-SG (base do backend): [https://github.com/gabrieljorliano/core-sg](https://github.com/gabrieljorliano/core-sg)
+- MustaCHE no TestPyPI: [https://test.pypi.org/project/mustache-core/0.2.0/](https://test.pypi.org/project/mustache-core/0.2.0/)
