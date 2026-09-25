@@ -1,7 +1,7 @@
 # MustaCHE (Multiple Cluster Hierarchies Explorer)
 
-![TestPyPI Version](https://img.shields.io/badge/TestPyPI-mustache--core%20v0.3.0rc1-blue)
-![Backend Version](https://img.shields.io/badge/backend-core--sg--mustache%20v0.4.5rc1-green)
+![TestPyPI Version](https://img.shields.io/badge/TestPyPI-mustache--core%20v0.3.0rc2-blue)
+![Backend Version](https://img.shields.io/badge/backend-core--sg--mustache%20v0.4.5rc2-green)
 ![Python Version](https://img.shields.io/badge/python-3.11-blue)
 ![Platform](https://img.shields.io/badge/platform-win__amd64-lightgrey)
 
@@ -33,7 +33,7 @@ In **MustaCHE v2**, the application has been completely re-engineered into a **1
 ### Prerequisites
 
 - **Python >= 3.10** (tested on Python 3.10, 3.11, 3.12, 3.13).
-- Pre-built binary wheels (`.whl`) with native Cython acceleration (`core-sg-mustache>=0.4.5rc1`) available for Windows 64-bit, Linux, and macOS—no C++ compiler or Visual Studio required for end users.
+- Pre-built binary wheels (`.whl`) with native Cython acceleration (`core-sg-mustache>=0.4.5rc2`) available for Windows 64-bit, Linux, and macOS—no C++ compiler or Visual Studio required for end users.
 
 ### 1. Create and Activate a Virtual Environment
 
@@ -91,10 +91,10 @@ python -m pip install --upgrade pip
 
 A single `pip install` command installs MustaCHE along with all required dependencies—including the **`core-sg-mustache`** backend engine, Flask, NumPy, Pandas, Scikit-Learn, Scipy, HDBSCAN, and Plotly. **End users do not need to install `core-sg-mustache` separately.**
 
-- **From TestPyPI (release candidate v0.3.0rc1)**:
+- **From TestPyPI (release candidate v0.3.0rc2)**:
 
   ```bash
-  pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --pre mustache-core==0.3.0rc1
+  pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --pre mustache-core==0.3.0rc2
   ```
 
 - **From PyPI (Official release)**:

@@ -29,12 +29,12 @@ Este documento separa três coisas que não devem ser confundidas no relatório 
 - Seleção manual de um ramo retornou `mpts 4, 6`; limpar seleção funcionou.
 - Nenhum erro grave foi observado no console do navegador.
 - Smoke test reproduzível disponível em `scripts/verify_web_ui.py`.
-- Wheels locais `mustache-core 0.3.0rc1` e `core-sg-mustache 0.4.5rc1` instaladas juntas em ambiente virtual limpo; a CLI e uma extração CORE-SG foram executadas com sucesso.
+- Wheels locais `mustache-core 0.3.0rc1` e `core-sg-mustache 0.4.5rc1` foram instaladas juntas em ambiente virtual limpo; as correções de publicação foram consolidadas nas candidatas `0.3.0rc2` e `0.4.5rc2`.
 - Suíte independente do CORE-SG concluída com 200 testes aprovados.
 
 ## Correções aplicadas ao relatório final
 
-1. Versões atualizadas para as candidatas `mustache-core 0.3.0rc1` e `core-sg-mustache 0.4.5rc1`.
+1. Versões atualizadas para as candidatas `mustache-core 0.3.0rc2` e `core-sg-mustache 0.4.5rc2`.
 2. Substituir “55 casos” pelo número produzido pela versão final da suíte. Nesta auditoria foram 66 testes.
 3. Não afirmar que o meta-dendrograma usa `average/UPGMA`: o checkout atual usa single linkage.
 4. Não afirmar que DBCV foi aplicada enquanto não houver implementação e resultados reproduzíveis. Hoje a aplicação calcula ARI e AMI com rótulos externos.

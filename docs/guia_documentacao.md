@@ -1,7 +1,7 @@
 # Guia de Documentação — MustaCHE v2
 
-**Código-fonte atual**: `mustache-core` v0.3.0rc1<br>
-**Backend mínimo**: `core-sg-mustache` v0.4.5rc1<br>
+**Código-fonte atual**: `mustache-core` v0.3.0rc2<br>
+**Backend mínimo**: `core-sg-mustache` v0.4.5rc2<br>
 **Estilo deste guia**: [Read the Docs](https://www.sphinx-doc.org/) / [MkDocs](https://www.mkdocs.org/)
 
 > Este documento serve como referência para usuários finais, orientadores e colaboradores que desejam **instalar, usar a API, interpretar saídas e operar a Web UI** do MustaCHE.
@@ -69,14 +69,14 @@ pip install --upgrade pip
 # Instalar o MustaCHE (puxa core-sg-mustache automaticamente)
 pip install --index-url https://test.pypi.org/simple \
             --extra-index-url https://pypi.org/simple \
-            --pre mustache-core==0.3.0rc1
+            --pre mustache-core==0.3.0rc2
 ```
 
 ### 2.3 Verificação
 
 ```python
 import mustache
-print(mustache.__version__)  # Esperado: 0.3.0rc1
+print(mustache.__version__)  # Esperado: 0.3.0rc2
 
 from mustache.core import run_clustering
 print("Backend Cython ativo")  # Sem erros = sucesso
@@ -352,7 +352,7 @@ with open('hierarquia.json', 'w') as f:
   author  = {[autores]},
   year    = {2026},
   url     = {https://test.pypi.org/project/mustache-core/},
-  version = {0.3.0rc1}
+  version = {0.3.0rc2}
 }
 ```
 
@@ -363,4 +363,4 @@ with open('hierarquia.json', 'w') as f:
 - Campello, R. J. G. B., et al. "Density-Based Clustering Based on Hierarchical Density Estimates." PAKDD 2013.
 - Documentação oficial do HDBSCAN: [https://hdbscan.readthedocs.io/](https://hdbscan.readthedocs.io/)
 - Core-SG (base do backend): [https://github.com/gabrieljorliano/core-sg](https://github.com/gabrieljorliano/core-sg)
-- MustaCHE no TestPyPI: [https://test.pypi.org/project/mustache-core/0.3.0rc1/](https://test.pypi.org/project/mustache-core/0.3.0rc1/)
+- MustaCHE no TestPyPI: [https://test.pypi.org/project/mustache-core/0.3.0rc2/](https://test.pypi.org/project/mustache-core/0.3.0rc2/)
