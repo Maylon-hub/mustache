@@ -380,7 +380,7 @@ processamento em lote e as visualizações coordenadas. A Figura~\ref{fig:datase
 anterior de escolha de conjuntos de dados reproduzíveis, enquanto a Figura~\ref{fig:projects}
 mostra a persistência e a reabertura das análises, completando o fluxo de uso da ferramenta.
 
-\begin{figure}[H]
+\begin{figure}[htbp]
   \centering
   \includegraphics[width=0.95\textwidth]{img/mustache-dashboard-teste.png}
   \caption{Interface principal do MustaCHE v2 após processamento em lote: meta-dendrograma,
@@ -388,14 +388,14 @@ mostra a persistência e a reabertura das análises, completando o fluxo de uso 
   \label{fig:dashboard}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
   \centering
   \includegraphics[width=0.95\textwidth]{img/datasets.png}
   \caption{Catálogo de conjuntos de dados de exemplo e sintéticos, com opção de envio de CSV.}
   \label{fig:datasets}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
   \centering
   \includegraphics[width=0.95\textwidth]{img/mustache-projects.png}
   \caption{Histórico local de projetos salvos, com metadados e reabertura sem recomputação.}
@@ -413,7 +413,7 @@ princípio fundamental do artigo original de reutilizar o grafo construído uma 
 A Tabela~\ref{tab:dell_antes} apresenta os tempos de agrupamento registrados antes da
 correção.
 
-\begin{table}[H]
+\begin{table}[htbp]
   \centering
   \caption{Tempos de agrupamento (Core Clustering Runs Time) na Dell T5600 antes da correção
            da integração.}
@@ -434,7 +434,7 @@ A correção consistiu em ajustar o \texttt{CoreSG} uma única vez com $k_{max}$
 repassar o objeto ajustado a todas as iterações. A Tabela~\ref{tab:dell_depois} compara o
 tempo total do lote (26 iterações, $mpts \in [5,30]$) antes e depois da otimização.
 
-\begin{table}[H]
+\begin{table}[htbp]
   \centering
   \caption{Tempo total do lote (26 iterações) antes e depois da reutilização do grafo de
            suporte.}
@@ -482,7 +482,7 @@ iteração de \textit{mpts}. A estratégia de pré-computação unificada do OPT
 tempo de 1,8261s para 0,1660s, uma redução de aproximadamente \textbf{91\%} (\textasciitilde
 11x mais rápido). A Tabela~\ref{tab:optics} resume o perfil de tempos antes e depois.
 
-\begin{table}[H]
+\begin{table}[htbp]
   \centering
   \caption{Perfil de tempos (Timing Profile Report) antes e depois da pré-computação do
            OPTICS.}
@@ -574,7 +574,7 @@ varreduras densas de parâmetros.
 
 A Tabela~\ref{tab:benchmark_consolidado} apresenta os resultados consolidados.
 
-\begin{table}[H]
+\begin{table}[htbp]
   \centering
   \caption{Resultados consolidados dos benchmarks: Core-SG vs HDBSCAN Canônico.}
   \label{tab:benchmark_consolidado}
@@ -611,7 +611,7 @@ A Tabela~\ref{tab:evolucao_hdbscan} compara o desempenho do HDBSCAN sem a flag d
 (aproximação de mercado) contra a versão canônica, demonstrando o custo computacional da
 canonicidade.
 
-\begin{table}[H]
+\begin{table}[htbp]
   \centering
   \caption{Evolução do desempenho do HDBSCAN: aproximação vs canônico.}
   \label{tab:evolucao_hdbscan}
