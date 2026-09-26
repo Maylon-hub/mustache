@@ -14,6 +14,7 @@ exclude_docs: |
   *.tex
   *.resolved
   auditoria_entrega_pibic.md
+  CONTEXTO_DESENVOLVIMENTO.md
   benchmark_report.md
   benchmark_report_canonical_hdbscan.md
   implementation_plan.md
