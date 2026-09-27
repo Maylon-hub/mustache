@@ -1,247 +1,150 @@
-# Manual de Reprodutibilidade — MustaCHE v2
+# Reproduction of the current MustaCHE source
 
-**Projeto**: MustaCHE — Multiple Cluster Hierarchies Explorer  
-**Versão documentada**: `mustache-core` v0.2.0 + `core-sg-mustache` v0.3.0  
-**Data de validação**: 18/09/2026  
-**Plataforma validada**: Windows 10/11 64-bit · Python 3.11.0  
-**DOI do software**: *[a ser registrado no Zenodo]*  
-**Repositório**: *[URL do GitHub]*
+This procedure targets the corrected source, not historical benchmark results
+or a previously published wheel. Record both Git commit IDs and any uncommitted
+patches before describing a run as reproducible.
 
-> Este documento segue as diretrizes de reprodutibilidade da **ACM Artifacts Review** e da **IEEE RepliQa**, permitindo que qualquer leitor do relatório técnico ou artigo reproduza integralmente os experimentos descritos.
+## Install both development repositories
 
----
-
-## 1. Escopo da Reprodutibilidade
-
-Este manual garante a reprodução de:
-
-1. ✅ Instalação do ambiente em máquina **sem compilador C++** (via wheels pré-compiladas no TestPyPI);
-2. ✅ Execução do motor de clustering `core-sg` com backend Cython nativo;
-3. ✅ Execução da suíte de benchmarks do MustaCHE;
-4. ✅ Geração dos CSVs, hierarquias e gráficos apresentados no relatório;
-5. ✅ Validação da suíte de testes (55/55 aprovados).
-
----
-
-## 2. Ambiente de Hardware e Software
-
-### 2.1 Requisitos mínimos de hardware
-
-| Componente | Mínimo | Recomendado |
-| :--- | :--- | :--- |
-| **CPU** | 4 cores | 8+ cores |
-| **RAM** | 8 GB | 16 GB |
-| **Disco** | 2 GB livres | 10 GB livres |
-| **GPU** | Não requerida | Não requerida |
-
-### 2.2 Requisitos de software
-
-| Componente | Versão |
-| :--- | :--- |
-| **Sistema operacional** | Windows 10/11 64-bit |
-| **Python** | 3.11.0 (obrigatório para a wheel `cp311-win_amd64`) |
-| **pip** | $\ge 23.0$ |
-| **Conexão com Internet** | Sim (para baixar pacotes do TestPyPI) |
-
-> ⚠️ **Importante**: Não é necessário instalar Visual Studio Build Tools, MSVC, nem qualquer compilador C++. As wheels publicadas no TestPyPI já contêm os binários Cython pré-compilados (`.pyd`).
-
----
-
-## 3. Instalação Reprodutível
-
-### 3.1 Criar ambiente virtual isolado
+Use CPython 3.11, Git and a compiler for a source build of CORE-SG. Commands
+below are PowerShell and do not require activating scripts:
 
 ```powershell
-python -m venv venv_reproducao
-.\venv_reproducao\Scripts\activate
+git clone --branch mustache-core-sg https://github.com/Maylon-hub/mustache.git
+git clone --branch develop https://github.com/Maylon-hub/core-sg.git
+cd mustache
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e ../core-sg
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pip check
+git rev-parse HEAD
+git -C ../core-sg rev-parse HEAD
+git diff
+git -C ../core-sg diff
+.\.venv\Scripts\python.exe -m pip freeze
 ```
 
-### 3.2 Atualizar ferramentas de empacotamento
+Use `.venv/bin/python` on Linux. Do not copy an existing environment
+between machines. Keep the pip freeze output with the experiment record.
+
+The official RC scope is Windows/Linux x86-64 with CPython 3.11. Linux results
+must be recorded from the artifact qualification workflow; configuration alone
+does not establish a pass. macOS is not currently qualified and remains future
+work. Other Python versions are not advertised by this RC.
+
+## Verify what is actually imported
 
 ```powershell
-pip install --upgrade pip setuptools wheel
+.\.venv\Scripts\python.exe -c "import mustache, core_sg; print(mustache.__file__); print(core_sg.__file__)"
+.\.venv\Scripts\python.exe -m mustache.cli --help
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-### 3.3 Instalar o MustaCHE e suas dependências
+Distribution metadata can be stale when PYTHONPATH points at a different source
+checkout. Inspect import paths as well as package versions. The technical-review
+tests compare known HAI values and the public unrounded CORE-SG path against
+reference HDBSCAN for multiple metrics and neighborhood settings.
+
+For the backend suite, from the CORE-SG checkout:
 
 ```powershell
-pip install --index-url https://test.pypi.org/simple \
-            --extra-index-url https://pypi.org/simple \
-            mustache-core==0.2.0
+..\mustache\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Este comando instala automaticamente:
+On restricted Windows execution environments, Joblib may fail to create named
+pipes and Numba may fail to write its cache. Record those environmental failures
+and rerun the affected tests in an environment that permits the required
+operations. Disabling JIT changes the test environment and must be disclosed.
 
-| Pacote | Versão | Conteúdo |
-| :--- | :--- | :--- |
-| `mustache-core` | 0.2.0 | Motor analítico, CLI, Web UI |
-| `core-sg-mustache` | 0.3.0 | Backend Cython compilado (`_mst_kruskal.pyd`, `_reweight.pyd`) |
-| `numpy`, `pandas`, `scikit-learn`, `scipy`, `plotly`, `Flask`, `hdbscan`, `pynndescent` | *(automático)* | Dependências transitivas |
+## Reproduce the API example and the interface
 
-### 3.4 Fixar versões (lock de reprodutibilidade)
-
-Para garantir que versões idênticas sejam usadas em execuções futuras:
+Run the code in the [user guide](guia_documentacao.md), then execute every cell
+of `examples/mustache_quickstart.ipynb` in the same environment.
 
 ```powershell
-pip freeze > requirements.lock.txt
+.\.venv\Scripts\python.exe -m mustache.cli --host 127.0.0.1 --port 5000
 ```
 
----
+In the browser:
 
-## 4. Validação da Instalação
+1. Open Datasets and configure Iris, CORE-SG, mpts 2..6, step 2, Manhattan.
+2. Verify the sidebar parameters, three ordered HAI entries, dendrogram and
+   representative hierarchy descriptions.
+3. Switch to distance-threshold mode and adjust the line. Then select a branch
+   to create a manual meta-cluster; verify that the mode and medoid update.
+4. Save, reopen the project and verify that parameters, active representatives,
+   manual groups and mode are unchanged. Threshold state is retained for
+   returning to threshold mode, not displayed as the active manual partition.
+5. Export the selected labels and verify the dataset sample count.
+6. Optionally repeat with the HDBSCAN comparison baseline on the same input,
+   range and metric. Record any differences rather than assuming universal parity.
 
-### 4.1 Teste de importação
+The maintained review check is `scripts/verify_web_ui.cjs`. It requires Node.js,
+Playwright and installed Google Chrome. The older Selenium script remains for
+compatibility but was not used in this review. Launch a separate test server
+with isolated project storage so browser-created projects do not affect your
+research records:
 
 ```powershell
-python -c "import mustache; print('MustaCHE:', mustache.__version__)"
-python -c "from mustache.core import run_clustering; print('Backend Cython OK')"
+$env:MUSTACHE_PROJECTS_DIR = Join-Path $env:TEMP ('mustache-ui-' + [guid]::NewGuid())
+.\.venv\Scripts\python.exe -m mustache.cli --host 127.0.0.1 --port 5057
 ```
 
-**Saída esperada**:
-```text
-MustaCHE: 0.2.0
-Backend Cython OK
-```
-
-### 4.2 Teste funcional mínimo
+In another terminal with Playwright available:
 
 ```powershell
-python -c "
-from mustache.core import run_clustering
-import numpy as np
-
-X = np.random.RandomState(42).rand(300, 5)
-result = run_clustering(X, method='hdbscan',
-                        match_reference_implementation=True,
-                        core_dist_n_jobs=1)
-print('Labels únicos:', len(np.unique(result['labels'])))
-"
+node scripts/verify_web_ui.cjs http://127.0.0.1:5057 ./ui-review
+# Optional baseline regression check:
+node scripts/verify_web_ui.cjs http://127.0.0.1:5057 ./ui-baseline-review hdbscan
 ```
 
-**Saída esperada**:
-```text
-Labels únicos: <número inteiro ≥ 1>
-```
+The default check uses CORE-SG. It checks save/reopen/export, manual representatives, metadata, assets and
+basic mobile overflow, and records JSON plus screenshots. Branch interaction
+is tested through Plotly events; this is not a pixel-level mouse-hit test.
 
-### 4.3 Suíte de testes automatizada
+## Candidate packages instead of source
+
+The current pair is `mustache-core==0.3.0rc3` and `core-sg-mustache==0.4.5rc3`.
+They are not published. Use locally built artifacts as described in
+[RC preparation](rc_preparation.md). Do not use an editable install or PYTHONPATH
+to qualify package installation. After a separately authorized TestPyPI upload,
+install stable dependencies first, then the two explicit candidates with
+`--no-deps`; do not request prereleases of every dependency.
 
 ```powershell
-pip install pytest
-pytest --tb=short
+python -m pip install Flask numpy pandas scikit-learn scipy plotly hdbscan==0.8.44 pynndescent
+# Only AFTER the separately authorized upload:
+python -m pip install --index-url https://test.pypi.org/simple/ --no-deps core-sg-mustache==0.4.5rc3 mustache-core==0.3.0rc3
+python -m pip check
 ```
 
-**Saída esperada**:
-```text
-55 passed in X.XXs
-```
+Verify wheel availability for the actual Python/platform combination. The
+commands are installation instructions, not evidence of availability checked
+during this review.
 
----
+## Benchmarks and scientific acceptance
 
-## 5. Execução dos Experimentos do Relatório
-
-### 5.1 Obter os scripts do experimento
-
-Os scripts usados para gerar os resultados do relatório estão versionados no repositório:
+Existing benchmark scripts include
+`scripts/benchmark_coresg_vs_hdbscan.py` and
+`scripts/benchmark_coresg_vs_hdbscan_canonical.py`.
+Their archived numbers predate correctness fixes. The updated scripts write to
+new experiment directories, not the archived documentation reports. To smoke
+test the scripts with bounded data and separate output directories:
 
 ```powershell
-git clone <URL_DO_REPOSITORIO>
-cd MustaCHE/scripts/benchmarks
+.\.venv\Scripts\python.exe scripts/benchmark_coresg_vs_hdbscan.py --quick --output-dir ./benchmark-smoke
+.\.venv\Scripts\python.exe scripts/benchmark_coresg_vs_hdbscan_canonical.py --quick --output-dir ./benchmark-canonical-smoke
 ```
 
-### 5.2 Seeds e parâmetros fixos
+These scripts still time unequal extraction versus complete fitting workloads;
+their ratios are not end-to-end MustaCHE speedups. The Windows Cython build
+helper is optional and was not executed during this review; source installation
+uses CORE-SG's packaging configuration.
 
-Para garantir reprodutibilidade total, os scripts utilizam:
-
-| Parâmetro | Valor fixo | Justificativa |
-| :--- | :--- | :--- |
-| `random_state` | `42` | Seed determinística para geração de dados sintéticos |
-| `core_dist_n_jobs` | `1` | Execução single-threaded para evitar não-determinismo de paralelismo |
-| `match_reference_implementation` | `True` | Garante compatibilidade com o HDBSCAN de referência |
-| `min_cluster_size` | conforme dataset | Especificado em cada script |
-| `min_samples` | conforme dataset | Especificado em cada script |
-
-### 5.3 Execução sequencial
-
-```powershell
-python run_benchmark_synthetic.py      # Seção 4.1 do relatório
-python run_benchmark_real_datasets.py  # Seção 4.2 do relatório
-python run_stability_analysis.py       # Seção 4.3 do relatório
-python generate_figures.py             # Gráficos do relatório
-```
-
-### 5.4 Artefatos gerados
-
-Após a execução, a pasta `output/` conterá:
-
-```text
-output/
-├── csv/
-│   ├── cluster_labels_*.csv
-│   ├── stability_scores_*.csv
-│   └── benchmark_summary.csv
-├── hierarchies/
-│   └── *.json   (árvores de dendrograma)
-└── figures/
-    ├── stability_comparison.png
-    ├── hierarchy_visualization.png
-    └── benchmark_heatmap.png
-```
-
----
-
-## 6. Verificação dos Resultados
-
-### 6.1 Critérios de aceitação
-
-| Verificação | Critério |
-| :--- | :--- |
-| **Idempotência** | Duas execuções consecutivas geram CSVs byte-idênticos |
-| **Integridade** | Todos os 55 testes pytest passam |
-| **Consistência** | Número de clusters e scores de estabilidade coincidem com os do relatório |
-
-### 6.2 Comparação com resultados publicados
-
-Os valores de referência estão em `output/expected_checksums.sha256`. Para validar:
-
-```powershell
-cd output
-Get-FileHash -Algorithm SHA256 csv/*.csv | Compare-Object -ReferenceObject (Get-Content expected_checksums.sha256)
-```
-
-Se não houver divergência, os resultados são bit-a-bit idênticos aos publicados.
-
----
-
-## 7. Limitações e Escopo de Plataforma
-
-| Plataforma | Status | Observação |
-| :--- | :--- | :--- |
-| **Windows 64-bit + Python 3.11** | ✅ Validado | Wheel `cp311-win_amd64` disponível no TestPyPI |
-| **Linux (manylinux)** | ⏳ Futuro | Requer CI/CD com `cibuildwheel` |
-| **macOS (Intel/ARM)** | ⏳ Futuro | Requer CI/CD com `cibuildwheel` |
-| **Python 3.10, 3.12, 3.13** | ⏳ Futuro | Requer rebuild das wheels |
-
-Para plataformas não suportadas, o `pip` tentará compilar o `sdist`, o que exigirá um compilador C++ (MSVC no Windows, GCC no Linux, Clang no macOS).
-
----
-
-## 8. Solução de Problemas
-
-| Sintoma | Causa provável | Solução |
-| :--- | :--- | :--- |
-| `ModuleNotFoundError: No module named 'mustache'` | Pacote não instalado | Reexecutar `pip install mustache-core==0.2.0` |
-| `ImportError: DLL load failed` | Python diferente de 3.11 | Usar Python 3.11.0 exatamente |
-| `ERROR: Could not find a version that satisfies the requirement` | `pip` sem acesso ao TestPyPI | Verificar `--index-url` e `--extra-index-url` |
-| Resultados não-idênticos entre execuções | Paralelismo não controlado | Fixar `core_dist_n_jobs=1` e `random_state=42` |
-| `error: Microsoft Visual C++ 14.0 is required` | `pip` tentando compilar `sdist` | Confirmar Python 3.11 64-bit e wheel correta |
-
----
-
-## 9. Contato e Suporte
-
-- **Autor**: Maylon [sobrenome] — [email UFSCar]
-- **Orientador(a)**: [nome] — [email]
-- **Instituição**: Universidade Federal de São Carlos (UFSCar)
-- **Programa**: IC PIBIC-Af — 2025/2026
-
-Dúvidas sobre reprodutibilidade devem ser registradas como *issues* no repositório do projeto.
+Do not cite their old timings as current performance or as equivalence to the
+Java/RNG implementation. A valid new comparison must use the same dataset,
+metric, density convention and output workload, include support construction
+and HAI/visualization costs where claimed, and retain per-run raw timings,
+seeds, dependency versions and hardware. No nonexistent checksums, scripts or
+bit-for-bit cross-platform guarantees are promised here.

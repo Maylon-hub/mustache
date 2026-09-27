@@ -1,30 +1,23 @@
-'''
-benchmark_coresg_vs_hdbscan.py
-Benchmark comparativo estendido: Core-SG (backend Cython otimizado) vs HDBSCAN puro.
+"""Benchmark extraction workloads, preserving historical scripts' scope.
 
-Cenários avaliados:
-1. Baselines (n pequeno/médio, d baixo)
-2. Alta Dimensionalidade (d >= 35, 50, 100)
-3. Grande Volume de Dados (n = 10.000, 20.000, 50.000)
-4. Varredura Densa de k_max (k_max = 50, 100)
-5. Simulação de Sessão Interativa Web (1 fit + 10 re-extrações vs 10 fits HDBSCAN)
-
-Uso:
-    python scripts/benchmark_coresg_vs_hdbscan.py
-'''
+Use --quick for a bounded smoke run; output goes to a new benchmark_runs directory.
+Neither script measures full browser latency or proves clustering equivalence.
+"""
 import sys
 import os
 import time
 import warnings
 import json
 import csv
+import argparse
+import platform
+import core_sg
 from pathlib import Path
 
 import numpy as np
 
-CORE_SG_PATH = r"C:\Users\guest\Documents\GitHub\core-sg"
-if CORE_SG_PATH not in sys.path:
-    sys.path.insert(0, CORE_SG_PATH)
+# Use the installed package or an explicitly configured PYTHONPATH.
+
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -44,7 +37,7 @@ def check_cython_backend():
 
 
 CONFIGS = [
-    # (n_samples, n_features, centers, k_max, Categoria)
+    # (n_samples, n_features, centers, k_max, Scenario)
     # --- 1. Baselines ---
     (300,    5, 3, 15, "Baseline (n=300, d=5)"),
     (500,    5, 4, 20, "Baseline (n=500, d=5)"),
@@ -52,15 +45,15 @@ CONFIGS = [
     (2000,   8, 5, 30, "Baseline (n=2000, d=8)"),
     (5000,  10, 6, 30, "Baseline (n=5000, d=10)"),
     # --- 2. Alta Dimensionalidade ---
-    (1000,  35, 5, 30, "Alta Dimensao (d=35)"),
-    (2000,  50, 5, 30, "Alta Dimensao (d=50)"),
-    (2000, 100, 5, 30, "Alta Dimensao (d=100)"),
-    # --- 3. Grande Volume ---
-    (10000, 10, 6, 30, "Grande Volume (n=10k)"),
-    (20000, 10, 6, 30, "Grande Volume (n=20k)"),
-    # --- 4. Varredura Densa ---
-    (2000,   8, 5, 50, "Varredura Densa (kmax=50)"),
-    (2000,   8, 5, 100, "Varredura Densa (kmax=100)"),
+    (1000,  35, 5, 30, "High dimensionality (d=35)"),
+    (2000,  50, 5, 30, "High dimensionality (d=50)"),
+    (2000, 100, 5, 30, "High dimensionality (d=100)"),
+    # --- 3. Large sample count ---
+    (10000, 10, 6, 30, "Large sample count (n=10k)"),
+    (20000, 10, 6, 30, "Large sample count (n=20k)"),
+    # --- 4. Dense sweep ---
+    (2000,   8, 5, 50, "Dense sweep (kmax=50)"),
+    (2000,   8, 5, 100, "Dense sweep (kmax=100)"),
 ]
 
 N_RUNS = 3
@@ -138,22 +131,30 @@ def bench_interactive_session(X, k_max: int, n_interactions: int = 10) -> dict:
 
 
 def main():
+    parser = argparse.ArgumentParser(description='MST-extraction workload benchmark (not full web latency)')
+    parser.add_argument('--quick', action='store_true', help='Run one small scenario and a small reuse simulation')
+    parser.add_argument('--output-dir', type=Path, default=Path('benchmark_runs') / time.strftime('%Y%m%d-%H%M%S'))
+    args = parser.parse_args()
+    configs = CONFIGS[:1] if args.quick else CONFIGS
+    runs = 1 if args.quick else N_RUNS
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
     cython_active = check_cython_backend()
 
     print("=" * 80)
-    print("  Benchmark Comparativo Otimizado: Core-SG (Cython) vs HDBSCAN")
+    print("  Extraction workload benchmark: Core-SG (Cython) vs HDBSCAN")
     print("=" * 80)
-    print(f"  Backend Cython: {'ATIVO' if cython_active else 'FALLBACK PYTHON'}")
-    print(f"  Configuracoes: {len(CONFIGS)} cenarios x {N_RUNS} runs cada")
+    print(f"  Backend Cython: {'ACTIVE' if cython_active else 'FALLBACK PYTHON'}")
+    print(f"  Configuration: {len(configs)} scenarios x {runs} runs each")
     print("=" * 80)
     print()
 
     results = []
-    header = f"{'n':>6} {'d':>4} {'k_max':>6}  {'HDBSCAN(s)':>12} {'CoreSG(s)':>12} {'Speedup':>9}   {'Categoria'}"
+    header = f"{'n':>6} {'d':>4} {'k_max':>6}  {'HDBSCAN(s)':>12} {'CoreSG(s)':>12} {'Speedup':>9}   {'Scenario'}"
     print(header)
     print("-" * len(header))
 
-    for n_samples, n_features, centers, k_max, category in CONFIGS:
+    for n_samples, n_features, centers, k_max, category in configs:
         X, _ = make_blobs(
             n_samples=n_samples,
             n_features=n_features,
@@ -161,8 +162,8 @@ def main():
             random_state=RANDOM_STATE,
         )
 
-        hdb = bench_hdbscan(X, k_max, N_RUNS)
-        csg = bench_coresg(X, k_max, N_RUNS)
+        hdb = bench_hdbscan(X, k_max, runs)
+        csg = bench_coresg(X, k_max, runs)
         speedup = hdb["mean_s"] / csg["mean_s"] if csg["mean_s"] > 0 else float("inf")
 
         row = {
@@ -180,7 +181,7 @@ def main():
         }
         results.append(row)
 
-        winner = "CoreSG" if speedup > 1.05 else ("HDBSCAN" if speedup < 0.95 else "Empate")
+        winner = "CoreSG" if speedup > 1.05 else ("HDBSCAN" if speedup < 0.95 else "Tie")
         print(
             f"{n_samples:>6} {n_features:>4} {k_max:>6}  "
             f"{hdb['mean_s']:>10.4f}s  {csg['mean_s']:>10.4f}s  "
@@ -189,83 +190,64 @@ def main():
 
     print()
     print("=" * 80)
-    print("  SIMULACAO DE SESSAO INTERATIVA WEB (10 re-analises de mpts, n=2.000, kmax=30)")
+    print("  REUSE MICROBENCHMARK (not browser latency)")
     print("=" * 80)
 
-    X_sess, _ = make_blobs(n_samples=2000, n_features=10, centers=5, random_state=RANDOM_STATE)
-    sess_res = bench_interactive_session(X_sess, k_max=30, n_interactions=10)
-    print(f"  HDBSCAN (10 x lote completo do zero): {sess_res['hdb_session_s']:.2f}s")
-    print(f"  Core-SG (1 x fit + 10 x re-extracoes): {sess_res['csg_session_s']:.2f}s")
-    print(f"  Speedup de Sessao Interativa Web:     {sess_res['speedup']:.2f}x  <- CoreSG VENCE POR LAVADA")
+    session_n, session_k, interactions = (90, 6, 3) if args.quick else (2000, 30, 10)
+    X_sess, _ = make_blobs(n_samples=session_n, n_features=10, centers=5, random_state=RANDOM_STATE)
+    sess_res = bench_interactive_session(X_sess, k_max=session_k, n_interactions=interactions)
+    sess_res.update(n_samples=session_n, k_max=session_k, interactions=interactions, runs=runs)
+    print(f"  HDBSCAN (complete model sweeps): {sess_res['hdb_session_s']:.2f}s")
+    print(f"  Core-SG (one fit and extraction sweeps): {sess_res['csg_session_s']:.2f}s")
+    print(f"  Reuse timing ratio:     {sess_res['speedup']:.2f}x")
     print("=" * 80)
 
-    out_dir = Path(__file__).parent.parent / "docs"
-    out_dir.mkdir(exist_ok=True)
+    out_dir = args.output_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
     csv_path = out_dir / "benchmark_results.csv"
 
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=results[0].keys())
         writer.writeheader()
         writer.writerows(results)
-    print(f"\nCSV salvo em: {csv_path}")
+    print(f"\nCSV saved to: {csv_path}")
 
     md_path = out_dir / "benchmark_report.md"
     _write_markdown_report(md_path, results, sess_res, cython_active)
-    print(f"Relatorio salvo em: {md_path}")
+    print(f"Report saved to: {md_path}")
 
     return results
 
 
 def _write_markdown_report(path: Path, results: list, sess_res: dict, cython_active: bool):
+    """Report only measured workloads, not unmeasured complexity guarantees."""
+    import importlib.metadata
+    canonical = 'hdbscan_canonical_median_s' in results[0]
+    hkey = 'hdbscan_canonical_median_s' if canonical else 'hdbscan_mean_s'
+    ckey = 'coresg_median_s' if canonical else 'coresg_mean_s'
+    skey = 'speedup_canonical' if canonical else 'speedup'
     lines = [
-        "# Benchmark Consolidado: Core-SG (Backend Cython) vs HDBSCAN",
-        "",
-        f"**Data**: {time.strftime('%Y-%m-%d %H:%M')}  ",
-        f"**Backend Cython**: {'✅ ATIVO' if cython_active else '⚠️ Fallback Python'}  ",
-        f"**Plataforma**: Windows 10 Pro, Python 3.11, MSVC v143  ",
-        f"**Runs por cenario**: {N_RUNS}  ",
-        "",
-        "## Resultados do Benchmark em Lote",
-        "",
-        "| n_samples | n_features | k_max | HDBSCAN (s) | Core-SG (s) | Speedup | Vencedor | Categoria |",
-        "|----------:|-----------:|------:|------------:|------------:|--------:|:---------|:----------|",
+        '# CORE-SG / HDBSCAN extraction workload benchmark', '',
+        f'Execution: {time.strftime("%Y-%m-%d %H:%M")}; platform: {platform.platform()}; Python: {platform.python_version()}.',
+        f'Cython active: {cython_active}; seed: {RANDOM_STATE}; runs: {sess_res["runs"]}.',
+        f'Aggregation: {"median" if canonical else "mean"}. Reference conventions: {canonical}.',
+        f'CORE-SG imported from: {core_sg.__file__}.',
+        f'Installed hdbscan: {importlib.metadata.version("hdbscan")}; numpy: {np.__version__}.', '',
+        'CAUTION: CORE-SG times support construction plus MST extraction, while HDBSCAN fits full models.',
+        'This is not an equal end-to-end scientific workload or a web latency benchmark.',
+        'No HAI, meta-clustering, frontend rendering or fresh label-equivalence validation is timed.', '',
+        '| Samples | Features | k_max | HDBSCAN (s) | CORE-SG (s) | HDBSCAN / CORE-SG |',
+        '|---:|---:|---:|---:|---:|---:|',
     ]
-
-    for r in results:
-        winner = "Core-SG" if r["speedup"] > 1.05 else ("HDBSCAN" if r["speedup"] < 0.95 else "Empate")
-        lines.append(
-            f"| {r['n_samples']:,} | {r['n_features']} | {r['k_max']} "
-            f"| {r['hdbscan_mean_s']:.4f} ± {r['hdbscan_std_s']:.4f} "
-            f"| {r['coresg_mean_s']:.4f} ± {r['coresg_std_s']:.4f} "
-            f"| **{r['speedup']:.2f}x** | {winner} | {r['category']} |"
-        )
-
-    lines += [
-        "",
-        "## Simulacao de Sessao Interativa Web (MustaCHE Web UI)",
-        "",
-        "Simulacao de um usuario interagindo com a interface web: **1 carga inicial de dados + 10 re-analises consecutivas** alterando o intervalo de mpts (n=2.000, d=10, kmax=30):",
-        "",
-        f"- **HDBSCAN** (10 execucoes do lote completo do zero): **{sess_res['hdb_session_s']:.2f}s**",
-        f"- **Core-SG** (1 fit() inicial + 10 re-extracoes extract_mst): **{sess_res['csg_session_s']:.2f}s**",
-        f"- **Speedup Real de Sessao Interativa**: **{sess_res['speedup']:.2f}x** (Core-SG vence por lavada na Web UI)",
-        "",
-        "## Analise Cientifica e Explicacao dos Resultados",
-        "",
-        "### 1. Vitoria Absoluta em Alta Dimensionalidade (d >= 35)",
-        "O HDBSCAN nativo usa KDTree/BallTree do Scikit-Learn. Em dimensoes d >= 35, arvores espaciais sofrem com a maldicao da dimensionalidade, degenerando para busca de vizinhos quadratica O(d * n^2) a cada k. O PyNNDescent do Core-SG mantem a construcao do grafo k-NN em O(n log n) independente de d, garantindo speedups massivos de ate 3.7x+.",
-        "",
-        "### 2. Otimizacao Espacial Adaptativa (cKDTree) e Fatiamento de Arestas",
-        "Para n <= 10.000 e d <= 15, o Core-SG agora utiliza cKDTree (C nativo), reduzindo o tempo do fit() de 1.74s para ~0.01s. Alem disso, o fatiamento dinamico de arestas por k garante que a extracao da MST processe apenas n * k + (n-1) arestas ativas por nivel, confirmando a amortizacao sub-linear do algoritmo.",
-        "",
-        "## Arquivos Gerados",
-        "",
-        "- Dados brutos: docs/benchmark_results.csv",
-        "- Script de benchmark: scripts/benchmark_coresg_vs_hdbscan.py",
-    ]
-
+    for row in results:
+        lines.append(f'| {row["n_samples"]} | {row["n_features"]} | {row["k_max"]} | {row[hkey]:.6f} | {row[ckey]:.6f} | {row[skey]:.4f} |')
+    lines += ['', '## Reuse simulation',
+        f'n={sess_res["n_samples"]}, k_max={sess_res["k_max"]}, sweeps={sess_res["interactions"]}.',
+        f'HDBSCAN: {sess_res["hdb_session_s"]:.6f} s; CORE-SG: {sess_res["csg_session_s"]:.6f} s; ratio: {sess_res["speedup"]:.4f}.',
+        'Reuses one CORE-SG instance across scripted sweeps; separate web batch requests do not share this cache.',
+        'These observations do not establish universal speedups or dimension-independent complexity.']
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -1,5 +1,5 @@
 site_name: MustaCHE Docs
-site_description: Documentação e guia de uso do MustaCHE — Multiple Cluster Hierarchies Explorer.
+site_description: Scientific and user documentation for MustaCHE — Multiple Cluster Hierarchies Explorer.
 site_author: Maylon Martins de Melo
 site_url: https://maylon-hub.github.io/mustache/
 repo_name: Maylon-hub/mustache
@@ -20,10 +20,12 @@ exclude_docs: |
   implementation_plan.md
   relatorio_empacotamento_wheels_e_testpypi.md
   requirements-docs.txt
+  final_audit_2026-09-27.md
+  final_summary_2026-09-27.md
 
 theme:
   name: material
-  language: pt-BR
+  language: en
   logo: assets/mustache-mark.svg
   favicon: assets/mustache-mark.svg
   palette:
@@ -33,14 +35,14 @@ theme:
       accent: custom
       toggle:
         icon: material/brightness-7
-        name: Usar tema escuro
+        name: Switch to dark theme
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: custom
       accent: custom
       toggle:
         icon: material/brightness-4
-        name: Usar tema claro
+        name: Switch to light theme
   features:
     - navigation.tabs
     - navigation.sections
@@ -52,11 +54,13 @@ theme:
     - search.highlight
 
 nav:
-  - Início: index.md
-  - Guia de uso: guia_documentacao.md
-  - Reprodução: reproducao.md
-  - Notebook rápido: https://github.com/Maylon-hub/mustache/blob/mustache-core-sg/examples/mustache_quickstart.ipynb
-  - Código-fonte: https://github.com/Maylon-hub/mustache
+  - Home: index.md
+  - User guide: guia_documentacao.md
+  - Reproduction: reproducao.md
+  - Release candidate: rc_preparation.md
+  - Technical review: technical_review_2026-09-26.md
+  - Quickstart notebook: https://github.com/Maylon-hub/mustache/blob/mustache-core-sg/examples/mustache_quickstart.ipynb
+  - Source code: https://github.com/Maylon-hub/mustache
 
 markdown_extensions:
   - admonition
