@@ -7,6 +7,19 @@ import numpy as np
 from sklearn.datasets import make_blobs, make_moons
 
 
+@pytest.fixture(autouse=True)
+def isolate_analysis_state(monkeypatch, tmp_path):
+    """Tests must never read/write the researcher's saved projects or leak cuts."""
+    from mustache.routes import SESSION_DATA
+    from mustache.core import storage
+    directory = tmp_path / 'projects'
+    directory.mkdir()
+    monkeypatch.setattr(storage, 'get_projects_dir', lambda: directory)
+    SESSION_DATA.clear()
+    yield
+    SESSION_DATA.clear()
+
+
 @pytest.fixture(scope="session")
 def blobs_100():
     """100 samples, 4 well-separated Gaussian clusters, 2D."""

@@ -182,7 +182,7 @@ class TestCutDendrogramRoute:
             content_type='application/json'
         )
         # Either 200 (if prior test left a session) or 400 (no session)
-        assert res.status_code in (200, 400)
+        assert res.status_code == 400
 
     def test_cut_after_batch_returns_200(self, flask_client):
         import json
@@ -218,4 +218,4 @@ class TestExportCSVRoute:
             content_type='application/json'
         )
         # 200 (session exists from prior test) or 400 (no session)
-        assert res.status_code in (200, 400)
+        assert res.status_code == 400
