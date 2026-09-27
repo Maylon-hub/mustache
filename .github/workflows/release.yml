@@ -1,4 +1,4 @@
-name: Manually promote validated artifacts to testpypi
+name: Manually promote validated artifacts to pypi
 on:
   workflow_dispatch:
     inputs:
@@ -20,8 +20,8 @@ jobs:
     if: inputs.publish
     runs-on: ubuntu-latest
     environment:
-      name: testpypi
-      url: https://test.pypi.org/p/mustache-core
+      name: pypi
+      url: https://pypi.org/p/mustache-core
     permissions:
       contents: read
       actions: read
@@ -57,5 +57,3 @@ jobs:
           python -m twine check dist/*
           python scripts/check_artifacts.py dist
       - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/

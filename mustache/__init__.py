@@ -10,6 +10,9 @@ except PackageNotFoundError:  # Source checkout without an installed distributio
 
 def create_app():
     app = Flask(__name__)
+    @app.context_processor
+    def package_information():
+        return {'mustache_version': __version__}
     
     # Configuration - allow override via environment variable for production security
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-mustache-change-in-prod')

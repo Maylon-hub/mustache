@@ -1,2 +1,24 @@
 recursive-include mustache/static *
 recursive-include mustache/templates *
+include README.md LICENSE CITATION.cff AUTHORS.md CHANGELOG.md RELEASE_NOTES.md DATASETS.md
+include AUTHORSHIP_APPROVAL_REQUIRED.md
+recursive-include requirements *.txt
+recursive-include tests *.py
+recursive-include scripts *.py *.cjs
+# Historical machine-specific development helpers are not release inputs.
+exclude scripts/test_cython_backend.py scripts/setup_cython_coresg.py
+include examples/mustache_quickstart.ipynb
+include examples/rc_minimal.py
+include docs/index.md docs/guia_documentacao.md docs/reproducao.md docs/rc_preparation.md
+# Build the complete documentation site from Git, not from the minimal sdist.
+recursive-include docs/assets *.svg
+recursive-include docs/stylesheets *.css
+recursive-include docs/img *.png
+prune legacy
+prune datasets
+prune build
+prune dist
+prune .venv
+prune .git
+prune .pytest_cache
+global-exclude *.pyc *.pyo .DS_Store
