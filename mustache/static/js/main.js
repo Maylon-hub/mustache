@@ -1,701 +1,349 @@
-// Global functions for modals
-function openBatchConfigModal() {
-    $('#batchConfigModal').modal('show');
-}
-window.openBatchConfigModal = openBatchConfigModal;
-
-// Open save project modal (available globally so base.html sidebar can call it)
-function openSaveProjectModal() {
-    const modal = document.getElementById('saveProjectModalMain');
-    if (!modal) {
-        // Inject modal HTML if not present on this page
-        const modalHtml = `
-        <div class="modal fade" id="saveProjectModalMain" tabindex="-1" role="dialog" aria-hidden="true">
-            <div class="modal-dialog" role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="fas fa-bookmark text-success mr-2"></i>Save Analysis to History</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label>Project / Dataset Name <span class="text-danger">*</span></label>
-                            <input type="text" id="main-save-proj-name" class="form-control" placeholder="e.g., Anuran Frog Exploration">
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-success" onclick="confirmSaveProjectMain()">Save Project</button>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-    }
+/* Coordinated analysis views. Server responses are the partition source of truth. */
+window.openBatchConfigModal = () => $('#batchConfigModal').modal('show');
+window.openSaveProjectModal = () => {
+    if (!document.getElementById('saveProjectModalMain')) document.body.insertAdjacentHTML('beforeend', `
+        <div class="modal fade" id="saveProjectModalMain" tabindex="-1" role="dialog" aria-label="Save project">
+          <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header"><h5>Save analysis</h5><button class="close" data-dismiss="modal" aria-label="Close">&times;</button></div>
+            <div class="modal-body"><label for="main-save-proj-name">Project name</label><input id="main-save-proj-name" class="form-control" maxlength="200"></div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-dismiss="modal">Cancel</button><button class="btn btn-success" onclick="confirmSaveProjectMain()">Save project</button></div>
+          </div></div>
+        </div>`);
     $('#saveProjectModalMain').modal('show');
-}
-window.openSaveProjectModal = openSaveProjectModal;
-
-async function confirmSaveProjectMain() {
-    const nameInput = document.getElementById('main-save-proj-name');
-    const name = nameInput ? nameInput.value.trim() : '';
-    if (!name) { alert('Please enter a project name.'); return; }
-    try {
-        const res = await fetch('/api/projects/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name,
-                selected_mpts: window.getSelectedMpts ? window.getSelectedMpts() : []
-            })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to save');
-        $('#saveProjectModalMain').modal('hide');
-        // Show brief success toast
-        const toast = document.createElement('div');
-        toast.className = 'alert alert-success';
-        toast.style.cssText = 'position:fixed;top:15px;right:15px;z-index:9999;min-width:280px;';
-        toast.innerHTML = '<i class="fas fa-check-circle mr-2"></i> Analysis saved! <a href="/projects" class="alert-link ml-2">View Projects</a>';
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 4000);
-    } catch (err) {
-        alert('Save Error: ' + err.message);
-    }
-}
-window.confirmSaveProjectMain = confirmSaveProjectMain;
+};
 
 document.addEventListener('DOMContentLoaded', () => {
+    let analysis = null, results = null, params = {}, metadata = {};
+    let selected = new Set(), tool = 'select', timer = null;
+    let manualGroups = [];
+    let cutSequence = 0, analysisGeneration = 0;
+    let pendingCut = Promise.resolve();
+    let representativeSignature = '';
+    const form = document.getElementById('batch-form');
+    const modeSelect = document.getElementById('meta-selection-mode');
+    const scaleSelect = document.getElementById('hai-scale-mode');
     const settingsKey = 'mustache.settings.v1';
-    let userSettings = {};
-    try { userSettings = JSON.parse(localStorage.getItem(settingsKey) || '{}'); } catch (_) {}
-    document.querySelectorAll('[data-mustache-setting]').forEach((field) => {
-        const name = field.dataset.mustacheSetting;
-        if (userSettings[name] !== undefined) field.value = userSettings[name];
+    let settings = {};
+    try { settings = JSON.parse(localStorage.getItem(settingsKey) || '{}'); } catch (_) {}
+    document.querySelectorAll('[data-mustache-setting]').forEach(field => {
+        if (settings[field.dataset.mustacheSetting] !== undefined) field.value = settings[field.dataset.mustacheSetting];
     });
-    const haiScaleSelect = document.getElementById('hai-scale-mode');
-    if (haiScaleSelect) {
-        haiScaleSelect.value = userSettings.hai_scale || 'adaptive';
-        haiScaleSelect.addEventListener('change', () => {
-            userSettings.hai_scale = haiScaleSelect.value;
-            if (latestAnalysis) renderHAIMatrix(latestAnalysis.hai_matrix, latestAnalysis.ordered_mpts);
-        });
+    if (form) {
+        const updateMetrics = () => {
+            const metric = form.elements.metric;
+            const choices = window.mustacheSupportedMetrics?.[form.elements.algorithm.value] || [];
+            [...metric.options].forEach(option => { option.disabled = !choices.includes(option.value); });
+            if (!choices.includes(metric.value)) metric.value = choices[0] || 'euclidean';
+        };
+        form.elements.algorithm.addEventListener('change', updateMetrics);
+        updateMetrics();
     }
-
-    // Sidebar Toggle
-    const btnToggle = document.querySelector('.fa-bars');
     const sidebar = document.querySelector('.sidebar');
-    const main = document.querySelector('.main');
+    document.querySelector('.fa-bars')?.addEventListener('click', () => {
+        sidebar.style.display = sidebar.style.display === 'none' ? 'flex' : 'none';
+    });
 
-    if (btnToggle && sidebar && main) {
-        btnToggle.addEventListener('click', () => {
-            if (sidebar.style.display === 'none') {
-                sidebar.style.display = 'flex';
-            } else {
-                sidebar.style.display = 'none';
-            }
-        });
-    }
-
-    // Global state variables
-    let latestAnalysis = null;
-    let batchResults = null;
-    let currentDendroTool = 'select'; // 'select', 'cut', 'pan'
-    let selectedBranches = new Set();
-    let currentMedoidsSignature = '';
-    let debounceRelayoutTimer = null;
-    const clientCutCache = new Map();
-
-    window.getSelectedMpts = () => Array.from(selectedBranches).sort((a, b) => a - b);
-
-    function refreshBranchStyles() {
-        const dendroDiv = document.getElementById('meta-dendrogram');
-        if (!dendroDiv || !Array.isArray(dendroDiv.data)) return;
-        dendroDiv.data.forEach((trace, traceIndex) => {
-            const values = (trace.meta?.mpts_values || []).map(Number);
-            if (!values.length) return;
-            const selected = values.every(value => selectedBranches.has(value));
-            Plotly.restyle(dendroDiv, {
-                'line.color': selected ? '#28a745' : '#2196F3',
-                'line.width': selected ? 8 : 5,
-                opacity: selected ? 1 : 0.8
-            }, [traceIndex]);
-        });
-    }
-
-    function toggleBranch(trace) {
-        const values = (trace?.meta?.mpts_values || []).map(Number);
-        if (!values.length) return;
-        const remove = values.every(value => selectedBranches.has(value));
-        values.forEach(value => remove ? selectedBranches.delete(value) : selectedBranches.add(value));
-        updateSelectedBranchesBadge();
-        refreshBranchStyles();
-        if (latestAnalysis) latestAnalysis.selected_mpts = window.getSelectedMpts();
-    }
-
-    function attachBranchClickHandler(dendroDiv) {
-        if (!dendroDiv) return;
-        dendroDiv.removeAllListeners?.('plotly_click');
-        dendroDiv.on('plotly_click', (event) => {
-            if (currentDendroTool !== 'select') return;
-            const point = event?.points?.[0];
-            if (!point) return;
-            toggleBranch(point.data);
-        });
-    }
-
-    window.clearSelectedBranches = function() {
-        selectedBranches.clear();
-        if (latestAnalysis) latestAnalysis.selected_mpts = [];
-        updateSelectedBranchesBadge();
-        refreshBranchStyles();
-    };
-
-    // Toolbar Tool Selection
-    window.setDendroTool = function(mode) {
-        currentDendroTool = mode;
-        ['btn-tool-wand', 'btn-tool-cut', 'btn-tool-pan'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.classList.remove('active');
-        });
-
-        const activeBtnMap = {
-            'select': 'btn-tool-wand',
-            'cut': 'btn-tool-cut',
-            'pan': 'btn-tool-pan'
+    function updateProjectInfo() {
+        const values = {
+            'proj-name': metadata.name || params.dataset_name || 'Unsaved analysis',
+            'proj-algorithm': params.algorithm === 'core-sg' ? 'CORE-SG' : (params.algorithm === 'hdbscan' ? 'HDBSCAN' : null),
+            'proj-min-mpts': params.min_mpts, 'proj-max-mpts': params.max_mpts,
+            'proj-step': params.step, 'proj-metric': params.metric,
+            'proj-points': params.n_samples ?? metadata.points,
+            'proj-time': params.execution_time == null ? null : Number(params.execution_time).toFixed(2) + ' s'
         };
-        const activeBtn = document.getElementById(activeBtnMap[mode]);
-        if (activeBtn) activeBtn.classList.add('active');
-
-        const dendroDiv = document.getElementById('meta-dendrogram');
-        if (!dendroDiv || !dendroDiv.data) return;
-
-        if (mode === 'pan') {
-            Plotly.relayout('meta-dendrogram', { dragmode: 'pan' });
-        } else if (mode === 'cut') {
-            Plotly.relayout('meta-dendrogram', { dragmode: false });
-        } else {
-            // select mode
-            // Branches are selected by clicking their blue lines.
-            Plotly.relayout('meta-dendrogram', { dragmode: false });
-        }
-    };
-
-    // Zoom Functions
-    window.zoomDendrogram = function(factor) {
-        const dendroDiv = document.getElementById('meta-dendrogram');
-        if (!dendroDiv || !dendroDiv.layout) return;
-
-        const yaxis = dendroDiv.layout.yaxis;
-        if (!yaxis || !yaxis.range) return;
-
-        const currentRange = yaxis.range;
-        const center = (currentRange[0] + currentRange[1]) / 2;
-        const span = (currentRange[1] - currentRange[0]) / factor;
-        Plotly.relayout('meta-dendrogram', {
-            'yaxis.range': [Math.max(0, center - span / 2), center + span / 2]
+        Object.entries(values).forEach(([id, value]) => {
+            const element = document.getElementById(id);
+            if (element) element.textContent = value ?? '—';
         });
-    };
-
-    window.resetDendrogramZoom = function() {
-        Plotly.relayout('meta-dendrogram', {
-            'xaxis.autorange': true,
-            'yaxis.autorange': true
+        if (form) Object.entries(params).forEach(([key, value]) => {
+            const field = form.elements.namedItem(key);
+            if (field && field.type !== 'file') field.value = value;
         });
-    };
+        ['btn-save-top', 'btn-sidebar-save'].forEach(id => {
+            const button = document.getElementById(id);
+            if (button) button.style.display = results ? 'inline-block' : 'none';
+        });
+    }
+    window.getSelectedMpts = () => [...selected].sort((a, b) => a - b);
 
-    // Branch Selection & Export
-    window.exportSelectedBranchesCSV = async function() {
-        if (!batchResults) {
-            alert('Please run a batch analysis first before exporting.');
-            return;
-        }
-
-        const exportBtn = document.getElementById('btn-export-csv');
-        const origHtml = exportBtn ? exportBtn.innerHTML : '';
-        if (exportBtn) {
-            exportBtn.disabled = true;
-            exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
-        }
-
-        try {
-            // If branches specifically selected, export them; otherwise export active medoids
-            const mptsToExport = selectedBranches.size > 0 
-                ? Array.from(selectedBranches)
-                : Object.values(latestAnalysis.medoids || {});
-
-            const res = await fetch('/export_branches_csv', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mpts_list: mptsToExport })
-            });
-
-            if (!res.ok) {
-                const errJson = await res.json();
-                throw new Error(errJson.error || 'Failed to export CSV');
-            }
-
-            const blob = await res.blob();
-            const downloadUrl = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            // Get filename from header or default
-            const disposition = res.headers.get('Content-Disposition');
-            let filename = 'mustache_clusters_export.csv';
-            if (disposition && disposition.indexOf('filename=') !== -1) {
-                filename = disposition.split('filename=')[1].replace(/"/g, '').trim();
-            }
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(downloadUrl);
-        } catch (err) {
-            alert('Export Error: ' + err.message);
-        } finally {
-            if (exportBtn) {
-                exportBtn.disabled = false;
-                exportBtn.innerHTML = origHtml;
-            }
-        }
-    };
-
-    function updateSelectedBranchesBadge() {
+    function refreshSelection() {
         const badge = document.getElementById('selected-branches-badge');
-        const clearButton = document.getElementById('btn-clear-selection');
-        if (!badge) return;
-        if (selectedBranches.size > 0) {
-            badge.style.display = 'inline-block';
-            const values = window.getSelectedMpts();
-            badge.innerText = `${values.length} hierarch${values.length > 1 ? 'ies' : 'y'} selected: mpts ${values.join(', ')}`;
-            badge.title = 'These hierarchies will be saved with the project and exported to CSV.';
-            if (clearButton) clearButton.style.display = 'inline-block';
-        } else {
-            badge.style.display = 'none';
-            if (clearButton) clearButton.style.display = 'none';
+        const clear = document.getElementById('btn-clear-selection');
+        if (badge) {
+            badge.style.display = selected.size ? 'inline-block' : 'none';
+            badge.textContent = `${selected.size} hierarchies selected: mpts ${window.getSelectedMpts().join(', ')}`;
+            badge.title = 'Selected branches define non-overlapping manual meta-clusters; their medoids are shown below. Selected hierarchies are also saved/exported.';
         }
+        if (clear) clear.style.display = selected.size ? 'inline-block' : 'none';
+        const div = document.getElementById('meta-dendrogram');
+        div?.data?.forEach((trace, i) => {
+            const values = trace.meta?.mpts_values || [];
+            if (!values.length) return;
+            const active = values.every(value => selected.has(Number(value)));
+            Plotly.restyle(div, { 'line.color': active ? '#1F6F5F' : '#2196F3', 'line.width': active ? 6 : 3, opacity: 1 }, [i]);
+        });
+    }
+    window.clearSelectedBranches = () => {
+        selected.clear(); manualGroups = []; refreshSelection();
+        if (analysis && modeSelect.value === 'manual') enqueuePartition(null).catch(error => alert(error.message));
+    };
+    window.setDendroTool = async value => {
+        tool = value;
+        const ids = { select: 'btn-tool-wand', cut: 'btn-tool-cut', pan: 'btn-tool-pan' };
+        Object.entries(ids).forEach(([name, id]) => document.getElementById(id)?.classList.toggle('active', name === value));
+        const div = document.getElementById('meta-dendrogram');
+        if (!div?.data) return;
+        if (value === 'cut' && modeSelect?.value !== 'threshold') {
+            modeSelect.value = 'threshold';
+            await changeMode();
+        }
+        Plotly.relayout(div, { dragmode: value === 'pan' ? 'pan' : false });
+    };
+    window.zoomDendrogram = factor => {
+        const div = document.getElementById('meta-dendrogram');
+        const range = div?._fullLayout?.yaxis?.range;
+        if (!range) return;
+        const centre = (range[0] + range[1]) / 2, half = (range[1] - range[0]) / (2 * factor);
+        Plotly.relayout(div, { 'yaxis.range': [Math.max(0, centre - half), centre + half] });
+    };
+    window.resetDendrogramZoom = () => {
+        if (document.getElementById('meta-dendrogram')?.data) Plotly.relayout('meta-dendrogram', { 'xaxis.autorange': true, 'yaxis.autorange': true });
+    };
+
+    async function requestPartition(threshold, mode, groups) {
+        const sequence = ++cutSequence, generation = analysisGeneration;
+        const response = await fetch('/cut_dendrogram', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(mode === 'automatic' ? { mode } : (mode === 'manual' ? { mode, groups } : { y_threshold: threshold }))
+        });
+        const partition = await response.json();
+        if (!response.ok) throw new Error(partition.error || 'Unable to select meta-clusters.');
+        if (sequence !== cutSequence || generation !== analysisGeneration) return;
+        Object.assign(analysis, partition);
+        renderReachability(partition.from_cache);
+    }
+    function enqueuePartition(threshold) {
+        // Serialize requests so the server's saved partition cannot regress
+        // behind the last visible cut when a user drags rapidly.
+        const mode = modeSelect.value, groups = manualGroups.map(group => [...group]);
+        pendingCut = pendingCut.catch(() => {}).then(() => requestPartition(threshold, mode, groups));
+        return pendingCut;
+    }
+    async function changeMode() {
+        if (!analysis) return;
+        clearTimeout(timer);
+        const div = document.getElementById('meta-dendrogram');
+        const max = Math.max(0, ...div.data.flatMap(trace => trace.y || []));
+        try {
+            await enqueuePartition(analysis.cut_threshold ?? max / 2);
+            await renderDendrogram();
+        } catch (error) { alert('Meta-cluster selection error: ' + error.message); }
+    }
+    modeSelect?.addEventListener('change', changeMode);
+
+    async function renderDendrogram() {
+        if (!analysis?.meta_dendrogram_json) return;
+        const figure = JSON.parse(analysis.meta_dendrogram_json);
+        figure.layout.margin = { t: 50, r: 20, l: 60, b: 55 };
+        figure.layout.font = { size: 12 };
+        if (modeSelect) modeSelect.value = analysis.selection_mode || 'automatic';
+        figure.layout.shapes = analysis.selection_mode === 'threshold' ? [{
+            type: 'line', x0: 0, x1: 1, xref: 'paper', yref: 'y',
+            y0: analysis.cut_threshold, y1: analysis.cut_threshold,
+            line: { color: '#9A681A', width: 2, dash: 'dot' }, editable: true
+        }] : [];
+        const div = document.getElementById('meta-dendrogram');
+        Plotly.purge(div); div.innerHTML = '';
+        await Plotly.newPlot(div, figure.data, figure.layout, { responsive: true, displayModeBar: false, edits: { shapePosition: true } });
+        refreshSelection();
+        div.on('plotly_click', event => {
+            if (tool !== 'select') return;
+            const values = (event.points?.[0]?.data?.meta?.mpts_values || []).map(Number);
+            if (!values.length) return;
+            const same = group => group.length === values.length && group.every(value => values.includes(value));
+            const remove = manualGroups.some(same);
+            // New ancestor/descendant replaces overlapping previous groups;
+            // each hierarchy can belong to at most one manual meta-cluster.
+            manualGroups = manualGroups.filter(group => !group.some(value => values.includes(value)));
+            if (!remove) manualGroups.push(values);
+            selected = new Set(manualGroups.flat());
+            modeSelect.value = 'manual';
+            Plotly.relayout(div, { shapes: [] });
+            refreshSelection();
+            enqueuePartition(null).catch(error => alert('Manual selection error: ' + error.message));
+        });
+        div.on('plotly_relayout', event => {
+            if (modeSelect.value !== 'threshold') return;
+            const height = event['shapes[0].y0'] ?? event['shapes[0].y1'] ?? event.shapes?.[0]?.y0;
+            if (height == null) return;
+            clearTimeout(timer);
+            timer = setTimeout(() => enqueuePartition(height).catch(error => alert('Cut error: ' + error.message)), 120);
+        });
     }
 
-    // --- Batch Processing Form ---
-    const batchForm = document.getElementById('batch-form');
-    if (batchForm) {
-        batchForm.onsubmit = async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const btn = e.target.querySelector('button[type="submit"]');
-            // UI State
-            const originalBtnHtml = btn.innerHTML;
-            btn.disabled = true;
-            
-            // Clear previous caches
-            clientCutCache.clear();
-            selectedBranches.clear();
-            currentMedoidsSignature = '';
-            updateSelectedBranchesBadge();
-
-            // Timer Logic
-            const startTime = Date.now();
-            const timeDisplay = document.getElementById('proj-time');
-            const timerInterval = setInterval(() => {
-                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-                btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Processing (${elapsed}s)...`;
-                if (timeDisplay) timeDisplay.innerText = elapsed + 's';
-            }, 100);
-
-            try {
-                const res = await fetch('/batch', { method: 'POST', body: formData });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Unknown error');
-
-                // Store Data
-                latestAnalysis = data.analysis;
-                batchResults = data.results;
-
-                if (latestAnalysis && latestAnalysis.error) {
-                    throw new Error(latestAnalysis.error);
-                }
-
-                // Update Project Info Sidebar
-                const sampleDataset = formData.get('sample_dataset');
-                const fileName = sampleDataset || formData.get('file')?.name || 'Uploaded File';
-                document.getElementById('proj-name').innerText = fileName;
-                document.getElementById('proj-min-mpts').innerText = formData.get('min_mpts');
-                if (timeDisplay && data.execution_time) {
-                    timeDisplay.innerText = data.execution_time + 's';
-                }
-
-                // Close Modal
-                $('#batchConfigModal').modal('hide');
-
-                // Reveal sidebar and top Save buttons
-                const sidebarSaveBtn = document.getElementById('btn-sidebar-save');
-                if (sidebarSaveBtn) sidebarSaveBtn.style.display = 'inline-block';
-                const topSaveBtn = document.getElementById('btn-save-top');
-                if (topSaveBtn) topSaveBtn.style.display = 'inline-block';
-
-                // 1. Render Meta-Dendrogram
-                if (latestAnalysis.meta_dendrogram_json) {
-                    const figure = JSON.parse(latestAnalysis.meta_dendrogram_json);
-
-                    // Adjust margins and spacing
-                    figure.layout.margin = { t: 20, r: 20, l: 40, b: 30 };
-
-                    // Add Threshold draggable line
-                    let maxY = 0;
-                    if (figure.data) {
-                        figure.data.forEach(trace => {
-                            if (Array.isArray(trace.y) && trace.y.length > 0) {
-                                const max_val = Math.max(...trace.y);
-                                if (max_val > maxY) maxY = max_val;
-                            }
-                        });
-                    }
-
-                    let threshold = maxY / 2; // initial
-                    figure.layout.shapes = [{
-                        type: 'line',
-                        x0: 0,
-                        x1: 1,
-                        xref: 'paper',
-                        y0: threshold,
-                        y1: threshold,
-                        yref: 'y',
-                        line: { color: '#e53935', width: 2, dash: 'dot' },
-                        editable: true
-                    }];
-
-                    Plotly.react('meta-dendrogram', figure.data, figure.layout, {
-                        responsive: true, displayModeBar: false,
-                        edits: { shapePosition: true }
-                    });
-
-                    const dendroDiv = document.getElementById('meta-dendrogram');
-
-                    attachBranchClickHandler(dendroDiv);
-
-                    // Relayout with Debounce & Quantized Height Interval Caching
-                    dendroDiv.on('plotly_relayout', (eventData) => {
-                        let newY = null;
-                        if (eventData['shapes[0].y0'] !== undefined) {
-                            newY = eventData['shapes[0].y0'];
-                        } else if (eventData['shapes[0].y1'] !== undefined) {
-                            newY = eventData['shapes[0].y1'];
-                        } else if (eventData.shapes && eventData.shapes[0]) {
-                            newY = eventData.shapes[0].y0;
-                        }
-
-                        if (newY === null) return;
-
-                        // Debounce slider updates to avoid firing dozens of calls during dragging
-                        clearTimeout(debounceRelayoutTimer);
-                        debounceRelayoutTimer = setTimeout(async () => {
-                            const cacheKey = newY.toFixed(4);
-
-                            // Check Client Cache First
-                            if (clientCutCache.has(cacheKey)) {
-                                const cached = clientCutCache.get(cacheKey);
-                                latestAnalysis.meta_labels = cached.meta_labels;
-                                latestAnalysis.medoids = cached.medoids;
-                                latestAnalysis.outliers = [];
-                                renderReachabilityPlots(cached.meta_labels, cached.medoids, true);
-                                return;
-                            }
-
-                            try {
-                                const res = await fetch('/cut_dendrogram', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ y_threshold: newY })
-                                });
-                                const cutData = await res.json();
-                                if (!res.ok) throw new Error(cutData.error);
-
-                                // Cache client response
-                                clientCutCache.set(cacheKey, cutData);
-
-                                latestAnalysis.meta_labels = cutData.meta_labels;
-                                latestAnalysis.medoids = cutData.medoids;
-                                latestAnalysis.outliers = [];
-                                renderReachabilityPlots(cutData.meta_labels, cutData.medoids, cutData.from_cache);
-                            } catch (err) {
-                                console.error('Dendrogram cut failed:', err);
-                            }
-                        }, 120); // 120ms debounce
-                    });
-                }
-
-                // 2. Render HAI Heatmap
-                renderHAIMatrix(latestAnalysis.hai_matrix, latestAnalysis.ordered_mpts);
-
-                // 3. Render Reachability Plots side by side
-                renderReachabilityPlots(latestAnalysis.meta_labels, latestAnalysis.medoids, false);
-
-            } catch (err) {
-                alert('Batch Error: ' + err.message);
-            } finally {
-                clearInterval(timerInterval);
-                btn.disabled = false;
-                btn.innerHTML = originalBtnHtml;
-            }
-        };
+    function renderHAI() {
+        if (!analysis?.hai_matrix) return;
+        const matrix = analysis.hai_matrix, mpts = analysis.ordered_mpts;
+        const values = matrix.flat(), min = Math.min(...values), max = Math.max(...values);
+        const mode = scaleSelect?.value || 'adaptive';
+        const offDiagonal = matrix.flatMap((row, i) => row.filter((_, j) => i !== j)).sort((a, b) => a - b);
+        const robustMin = offDiagonal[Math.floor(offDiagonal.length * 0.1)] ?? min;
+        const lower = mode === 'fixed' ? 0 : (mode === 'robust' ? robustMin : min);
+        const upper = mode === 'fixed' ? 1 : Math.max(max, lower + 1e-9);
+        const method = analysis.hai_computation;
+        const note = document.getElementById('hai-method-note');
+        if (note) {
+            note.textContent = !method ? 'HAI method metadata unavailable in this older project.' : method.approximate
+                ? `Approximate HAI · ${method.pair_count.toLocaleString()} sampled pairs · seed ${method.random_state} · 95% per-comparison bound ±${method.absolute_error_bound.toFixed(4)}`
+                : 'Exact HAI · all point pairs';
+            note.title = method ? JSON.stringify(method) : '';
+        }
+        const ticks = mpts.filter((_, i) => i % Math.max(1, Math.ceil(mpts.length / 12)) === 0);
+        Plotly.react('hai-heatmap', [{
+            type: 'heatmap', z: matrix, x: mpts, y: mpts,
+            // Preserve the original HAI visual convention: lighter = higher agreement.
+            colorscale: [[0, '#1F6F5F'], [1, '#F5F5F2']], zmin: lower, zmax: upper,
+            hovertemplate: 'mpts %{y} × %{x}<br>HAI: %{z:.8f}<extra></extra>',
+            colorbar: { orientation: 'h', yanchor: 'top', y: -0.18, thickness: 15, tickfont: { size: 12 } }
+        }], {
+            margin: { t: 55, r: 20, l: 55, b: 85 }, font: { size: 12 },
+            annotations: [{ text: `Scale: ${mode} [${lower.toFixed(4)}, ${upper.toFixed(4)}]${mode === 'robust' ? ' · lowest 10% clipped' : ''}`, xref: 'paper', yref: 'paper', x: 0, y: 1.16, xanchor: 'left', showarrow: false, font: { size: 12 } }],
+            xaxis: { side: 'top', tickmode: 'array', tickvals: ticks, title: 'mpts' },
+            yaxis: { autorange: 'reversed', tickmode: 'array', tickvals: ticks, title: 'mpts' }
+        }, { responsive: true, displayModeBar: false });
+    }
+    if (scaleSelect) {
+        scaleSelect.value = settings.hai_scale || 'adaptive';
+        scaleSelect.addEventListener('change', renderHAI);
     }
 
-    // --- Helper Functions ---
-
-    function renderHAIMatrix(matrix, mpts_labels) {
-        const flattened = matrix.flat().filter(Number.isFinite);
-        const observedMin = flattened.length ? Math.min(...flattened) : 0;
-        const observedMax = flattened.length ? Math.max(...flattened) : 1;
-        const scaleMode = haiScaleSelect?.value || userSettings.hai_scale || 'adaptive';
-        const fixedScale = scaleMode === 'fixed';
-        const offDiagonal = [];
-        matrix.forEach((row, rowIndex) => row.forEach((value, columnIndex) => {
-            if (rowIndex !== columnIndex && Number.isFinite(value)) offDiagonal.push(value);
-        }));
-        offDiagonal.sort((a, b) => a - b);
-        const robustIndex = Math.min(offDiagonal.length - 1, Math.floor(offDiagonal.length * 0.10));
-        const robustMin = offDiagonal.length ? offDiagonal[Math.max(0, robustIndex)] : observedMin;
-        const colorMin = fixedScale ? 0 : (scaleMode === 'robust' ? robustMin : observedMin);
-        const data = [{
-            z: matrix,
-            x: mpts_labels,
-            y: mpts_labels,
-            type: 'heatmap',
-            colorscale: 'Purples',
-            reversescale: true,
-            zmin: colorMin,
-            zmax: fixedScale ? 1 : observedMax,
-            hovertemplate: 'mpts %{y} × %{x}<br>HAI: %{z:.6f}<extra></extra>',
-            showscale: true,
-            colorbar: {
-                orientation: 'h',
-                yanchor: 'top',
-                y: -0.15,
-                thickness: 15,
-                tickfont: { size: 10 }
-            }
-        }];
-
-        const layout = {
-            margin: { t: 30, r: 20, l: 40, b: 60 },
-            annotations: [{
-                text: scaleMode === 'fixed'
-                    ? 'Scale: fixed [0, 1]'
-                    : scaleMode === 'robust'
-                        ? `Scale: robust [${robustMin.toFixed(4)}, ${observedMax.toFixed(4)}], lowest 10% clipped`
-                        : `Scale: adaptive [${observedMin.toFixed(4)}, ${observedMax.toFixed(4)}]`,
-                xref: 'paper', yref: 'paper', x: 1, y: 1.12,
-                xanchor: 'right', showarrow: false,
-                font: { size: 10, color: '#6c757d' }
-            }],
-            xaxis: {
-                side: 'top',
-                tickfont: { size: 10 },
-                tickmode: 'array',
-                tickvals: mpts_labels
-            },
-            yaxis: {
-                autorange: 'reversed',
-                tickfont: { size: 10 },
-                tickmode: 'array',
-                tickvals: mpts_labels
-            }
-        };
-
-        Plotly.react('hai-heatmap', data, layout, { responsive: true, displayModeBar: false });
-    }
-
-    function renderReachabilityPlots(labels, medoids_mpts, isCached = false) {
+    function renderReachability(cached = false) {
         const container = document.getElementById('reachability-container');
         if (!container) return;
-
-        // Check if medoids partition changed
-        const outliers = (latestAnalysis?.outliers || []).map(Number).sort((a, b) => a - b);
-        const medoidValues = Object.values(medoids_mpts || {}).map(Number).sort((a, b) => a - b);
-        const newSig = `${medoidValues.join('-')}|outliers:${outliers.join('-')}`;
-        const cacheIndicator = document.getElementById('cache-indicator');
-        if (cacheIndicator) {
-            const count = medoidValues.length;
-            const outlierText = outliers.length ? ` + ${outliers.length} outlier${outliers.length > 1 ? 's' : ''}` : '';
-            cacheIndicator.innerHTML = isCached || (currentMedoidsSignature === newSig && currentMedoidsSignature !== '')
-                ? `<i class="fas fa-bolt text-warning mr-1"></i> Instant Cache (${count} groups${outlierText})`
-                : `<i class="fas fa-check-circle text-success mr-1"></i> Active (${count} groups${outlierText})`;
-        }
-
-        // If medoids are identical to already rendered, avoid re-rendering DOM
-        if (currentMedoidsSignature === newSig && currentMedoidsSignature !== '') {
-            return;
-        }
-        currentMedoidsSignature = newSig;
-
-        container.innerHTML = ''; // Clear previous plots
-
-        const colors = ['#00bcd4', '#2196f3', '#4caf50', '#673ab7', '#ff9800', '#e91e63'];
-
-        let i = 0;
-        const plots = medoidValues.map((mpts) => ({ mpts, outlier: false }))
-            .concat(outliers.map((mpts) => ({ mpts, outlier: true })));
-        plots.forEach(({ mpts: mptsValue, outlier }) => {
-            const result = batchResults ? batchResults[mptsValue] : null;
-
-            if (!result || (!result.reachability_json && !result.reachability_data)) return;
-
-            const color = outlier ? '#dc3545' : colors[i % colors.length];
-
-            // Create wrapper div
-            const wrapperId = 'reach-plot-' + mptsValue;
-            const rDiv = document.createElement('div');
-            rDiv.className = 'reachability-plot-wrapper mr-3 flex-shrink-0';
-            rDiv.style.width = '280px';
-            rDiv.style.height = '380px';
-            rDiv.id = wrapperId;
-            container.appendChild(rDiv);
-
-            // New batch responses use compact arrays; saved/legacy projects may
-            // still contain a complete Plotly figure.
-            const figure = result.reachability_json
-                ? JSON.parse(result.reachability_json)
-                : {
-                    data: [{
-                        type: 'bar',
-                        x: result.reachability_data.x,
-                        y: result.reachability_data.y,
-                        marker: { color: result.reachability_data.labels },
-                        hovertemplate: '<b>Point %{x}</b><br>Distance: %{y:.3f}<extra></extra>'
-                    }],
-                    layout: {
-                        template: 'plotly_white',
-                        xaxis: { title: 'Sample Index (Ordered)' },
-                        yaxis: { title: 'Reachability Distance' }
-                    }
-                };
-
-            // Override colors and layout for small multiples
-            if (figure.data && figure.data[0]) {
-                figure.data[0].marker = { color: color };
-            }
-            figure.layout.title = '';
-            figure.layout.margin = { t: 15, r: 10, l: 30, b: 35 };
-
-            figure.layout.annotations = [{
-                text: (outlier ? 'Outlier mpts: ' : 'Medoid mpts: ') + mptsValue,
-                xref: 'paper', yref: 'paper',
-                x: 0.5, y: -0.1,
-                showarrow: false,
-                font: { color: '#fff', size: 11, weight: 'bold' },
-                bgcolor: color,
-                borderpad: 4
-            }];
-
-            Plotly.newPlot(wrapperId, figure.data, figure.layout, { responsive: true, displayModeBar: false });
-            i++;
+        const representatives = Object.entries(analysis.medoids || {}).map(([group, mpts]) => ({ group, mpts: Number(mpts), outlier: false }));
+        const outliers = (analysis.outliers || []).map(mpts => ({ mpts: Number(mpts), outlier: true }));
+        const signature = JSON.stringify([representatives, outliers, analysis.meta_labels]);
+        const indicator = document.getElementById('cache-indicator');
+        if (indicator) indicator.textContent = `${representatives.length} meta-clusters · ${outliers.length} outliers${analysis.selection_mode === 'manual' ? ` · manual · ${analysis.ordered_mpts.length - manualGroups.flat().length} unselected` : ''}${cached ? ' · cached partition' : ''}`;
+        if (signature === representativeSignature) return;
+        representativeSignature = signature;
+        container.querySelectorAll('.js-plotly-plot').forEach(div => Plotly.purge(div));
+        container.innerHTML = '';
+        [...representatives, ...outliers].forEach(({ group, mpts, outlier }) => {
+            const result = results?.[mpts];
+            if (!result?.reachability_data && !result?.reachability_json) return;
+            const wrapper = document.createElement('div');
+            wrapper.className = 'reachability-plot-wrapper mr-3 flex-shrink-0'; wrapper.style.width = '360px';
+            const heading = document.createElement('div'); heading.className = 'small px-3 pt-2';
+            heading.textContent = outlier ? `Meta-clustering outlier: mpts = ${mpts}` : `Representative hierarchy (medoid): mpts = ${mpts}`;
+            heading.title = outlier ? 'No automatic meta-cluster contains this hierarchy; it is not a medoid.' : `Meta-cluster ${group}: minimizes the sum of 1 − HAI to other hierarchies in this group.`;
+            const note = document.createElement('div'); note.className = 'small text-muted px-3';
+            const reach = result.reachability_data;
+            note.textContent = reach?.method === 'hierarchy-adjacent-cophenetic' ? `${outlier ? 'Outlier hierarchy' : 'Meta-cluster ' + group} · distances from this hierarchy` : 'Older saved layout: geometry may be shared across mpts.';
+            const chart = document.createElement('div'); chart.style.height = '345px';
+            wrapper.append(heading, note, chart); container.append(wrapper);
+            const inspect = document.createElement('button');
+            inspect.className = 'btn btn-sm btn-link px-3'; inspect.textContent = 'Inspect hierarchy';
+            inspect.addEventListener('click', () => inspectHierarchy(mpts));
+            wrapper.insertBefore(inspect, chart);
+            const figure = reach ? {
+                data: [{ type: 'bar', x: reach.x, y: reach.y, customdata: reach.x.map((_, j) => [reach.ordering?.[j] ?? j, reach.labels[j]]), hovertemplate: 'Sample %{customdata[0]}<br>Hierarchy distance: %{y:.6f}<br>Cluster: %{customdata[1]}<extra></extra>' }],
+                layout: { template: 'plotly_white', xaxis: { title: 'Sample order' }, yaxis: { title: 'Hierarchy reachability distance', rangemode: 'tozero' } }
+            } : JSON.parse(result.reachability_json);
+            figure.data.forEach(trace => { trace.marker = { color: outlier ? '#8D8D88' : '#1F6F5F' }; });
+            Object.assign(figure.layout, { title: '', annotations: [], font: { size: 12 }, margin: { t: 10, r: 15, l: 65, b: 55 } });
+            Plotly.newPlot(chart, figure.data, figure.layout, { responsive: true, displayModeBar: false });
         });
-
-        if (i === 0) {
-            container.innerHTML = '<div class="text-muted p-3">No valid clusters found for current threshold cut.</div>';
-        }
+        if (!container.children.length) container.textContent = 'No representative hierarchies are available.';
     }
 
-    // Listen for project loaded from ?project_id= URL param (fired by index.html inline script)
-    document.addEventListener('mustache:project-loaded', (event) => {
-        const { analysis, results, metadata } = event.detail;
-
-        latestAnalysis = analysis;
-        batchResults = results;
-        clientCutCache.clear();
-        selectedBranches = new Set((analysis.selected_mpts || []).map(Number));
-        currentMedoidsSignature = '';
-        updateSelectedBranchesBadge();
-
-        // Reveal top and sidebar Save buttons
-        const topSaveBtn = document.getElementById('btn-save-top');
-        if (topSaveBtn) topSaveBtn.style.display = 'inline-block';
-        const sidebarSaveBtn = document.getElementById('btn-sidebar-save');
-        if (sidebarSaveBtn) sidebarSaveBtn.style.display = 'inline-block';
-
-        // Render Meta-Dendrogram from saved JSON
-        if (analysis.meta_dendrogram_json) {
-            const figure = JSON.parse(analysis.meta_dendrogram_json);
-            figure.layout.margin = { t: 20, r: 20, l: 40, b: 30 };
-
-            let maxY = 0;
-            if (figure.data) {
-                figure.data.forEach(trace => {
-                    if (Array.isArray(trace.y)) {
-                        const m = Math.max(...trace.y);
-                        if (m > maxY) maxY = m;
-                    }
-                });
-            }
-            const threshold = maxY / 2;
-            figure.layout.shapes = [{
-                type: 'line', x0: 0, x1: 1, xref: 'paper',
-                y0: threshold, y1: threshold, yref: 'y',
-                line: { color: '#e53935', width: 2, dash: 'dot' },
-                editable: true
-            }];
-
-            // Clear spinner/placeholder before initializing Plotly.
-            // Plotly.react silently fails when the div contains arbitrary HTML
-            // (not an existing Plotly plot), leaving the spinner stuck forever.
-            const dendroContainer = document.getElementById('meta-dendrogram');
-            if (dendroContainer) dendroContainer.innerHTML = '';
-
-            Plotly.newPlot('meta-dendrogram', figure.data, figure.layout, {
-                responsive: true, displayModeBar: false,
-                edits: { shapePosition: true }
-            });
-
-            // Re-attach relayout handler so threshold dragging still works
-            const dendroDiv2 = document.getElementById('meta-dendrogram');
-            if (dendroDiv2) {
-                attachBranchClickHandler(dendroDiv2);
-                refreshBranchStyles();
-                dendroDiv2.on('plotly_relayout', (evData) => {
-                    let newY = null;
-                    if (evData['shapes[0].y0'] !== undefined) newY = evData['shapes[0].y0'];
-                    else if (evData['shapes[0].y1'] !== undefined) newY = evData['shapes[0].y1'];
-                    else if (evData.shapes && evData.shapes[0]) newY = evData.shapes[0].y0;
-                    if (newY === null) return;
-                    clearTimeout(debounceRelayoutTimer);
-                    debounceRelayoutTimer = setTimeout(async () => {
-                        const cacheKey = newY.toFixed(4);
-                        if (clientCutCache.has(cacheKey)) {
-                            const cached = clientCutCache.get(cacheKey);
-                            latestAnalysis.meta_labels = cached.meta_labels;
-                            latestAnalysis.medoids = cached.medoids;
-                            renderReachabilityPlots(cached.meta_labels, cached.medoids, true);
-                            return;
-                        }
-                        try {
-                            const res = await fetch('/cut_dendrogram', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ y_threshold: newY })
-                            });
-                            const cutData = await res.json();
-                            if (!res.ok) throw new Error(cutData.error);
-                            clientCutCache.set(cacheKey, cutData);
-                            latestAnalysis.meta_labels = cutData.meta_labels;
-                            latestAnalysis.medoids = cutData.medoids;
-                            renderReachabilityPlots(cutData.meta_labels, cutData.medoids, cutData.from_cache);
-                        } catch (err) { console.error('Dendrogram cut (project) failed:', err); }
-                    }, 120);
-                });
-            }
-        }
-
-        // Render HAI Matrix
-        if (analysis.hai_matrix && analysis.ordered_mpts) {
-            renderHAIMatrix(analysis.hai_matrix, analysis.ordered_mpts);
-        }
-
-        // Render Reachability Plots with current medoids
-        if (analysis.meta_labels && analysis.medoids) {
-            renderReachabilityPlots(analysis.meta_labels, analysis.medoids, false);
-        }
+    async function renderAnalysis() {
+        const select = document.getElementById('inspect-mpts');
+        if (select) select.replaceChildren(...analysis.ordered_mpts.map(mpts => new Option(`mpts = ${mpts}`, mpts)));
+        updateProjectInfo(); refreshSelection();
+        await renderDendrogram(); renderHAI(); renderReachability();
+    }
+    if (form) form.addEventListener('submit', async event => {
+        event.preventDefault();
+        // Flush any pending cut before replacing the analysis session.
+        clearTimeout(timer); await pendingCut.catch(() => {});
+        const button = form.querySelector('[type="submit"]'), original = button.innerHTML;
+        button.disabled = true;
+        const start = Date.now();
+        const interval = setInterval(() => { button.textContent = `Processing (${((Date.now() - start) / 1000).toFixed(1)} s)…`; }, 100);
+        try {
+            const response = await fetch('/batch', { method: 'POST', body: new FormData(form) });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Unable to run batch.');
+            analysisGeneration++; cutSequence++; selected.clear(); manualGroups = []; representativeSignature = '';
+            analysis = data.analysis; results = data.results; params = data.params; metadata = {};
+            $('#batchConfigModal').modal('hide');
+            await renderAnalysis();
+        } catch (error) { alert('Batch error: ' + error.message); }
+        finally { clearInterval(interval); button.disabled = false; button.innerHTML = original; }
     });
-
+    document.addEventListener('mustache:project-loaded', async event => {
+        ({ analysis, results, params, metadata } = event.detail);
+        analysisGeneration++; cutSequence++; representativeSignature = '';
+        selected = new Set((analysis.selected_mpts || []).map(Number));
+        manualGroups = analysis.manual_groups || [];
+        await renderAnalysis();
+    });
+    window.confirmSaveProjectMain = async () => {
+        const name = document.getElementById('main-save-proj-name').value.trim();
+        if (!name) return alert('Enter a project name.');
+        try {
+            clearTimeout(timer);
+            // Capture a dragged threshold even if its debounce has not fired.
+            if (modeSelect?.value === 'threshold') await enqueuePartition(document.getElementById('meta-dendrogram').layout.shapes[0].y0);
+            await pendingCut;
+            const response = await fetch('/api/projects/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, selected_mpts: window.getSelectedMpts() }) });
+            const data = await response.json(); if (!response.ok) throw new Error(data.error);
+            metadata = data.project; updateProjectInfo(); $('#saveProjectModalMain').modal('hide');
+            alert('Analysis saved. Open Projects & History to reopen or download it.');
+        } catch (error) { alert('Save error: ' + error.message); }
+    };
+    function inspectHierarchy(mpts) {
+        const result = results?.[mpts], reach = result?.reachability_data;
+        if (!reach) return alert('This older project did not preserve detailed hierarchy arrays.');
+        if (!document.getElementById('hierarchyDetailModal')) document.body.insertAdjacentHTML('beforeend', `
+            <div id="hierarchyDetailModal" class="modal fade" tabindex="-1" role="dialog" aria-label="Detailed hierarchy">
+            <div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header">
+            <h5 id="hierarchy-detail-title"></h5><button class="close" data-dismiss="modal" aria-label="Close">&times;</button></div>
+            <div class="modal-body"><p class="small">Colors are flat-cluster labels within this hierarchy, not corresponding clusters across mpts. Black indicates noise. Hover shows the original sample index; drag to zoom.</p><div id="hierarchy-detail-plot" style="height:480px;"></div></div></div></div></div>`);
+        document.getElementById('hierarchy-detail-title').textContent = `Hierarchy: mpts = ${mpts} · ${result.metric || params.metric || 'metric unavailable'}`;
+        const colors = ['#1F6F5F', '#486B8A', '#C9823B', '#847A96', '#879C7D', '#A06F65', '#577F7A', '#8D8D88'];
+        const labels = [...new Set(reach.labels)].sort((a, b) => a - b);
+        const traces = labels.map((label, i) => {
+            const indices = reach.labels.map((value, j) => value === label ? j : -1).filter(j => j >= 0);
+            return { type: 'bar', name: label === -1 ? 'Noise' : `Cluster ${label}`,
+                x: indices.map(j => reach.x[j]), y: indices.map(j => reach.y[j]),
+                customdata: indices.map(j => reach.ordering?.[j] ?? j),
+                marker: { color: label === -1 ? '#000000' : colors[i % colors.length] },
+                hovertemplate: 'Sample %{customdata}<br>Hierarchy distance: %{y:.6f}<extra>%{fullData.name}</extra>' };
+        });
+        const description = document.querySelector('#hierarchyDetailModal p');
+        description.textContent = 'Colors are flat-cluster labels within this hierarchy, not corresponding clusters across mpts. Black indicates noise. Hover shows the original sample index; drag to zoom.';
+        if (labels.filter(label => label >= 0).length > colors.length) description.textContent += ' More than eight clusters: colors repeat; use legend and hover labels.';
+        $('#hierarchyDetailModal').one('shown.bs.modal', () => Plotly.react('hierarchy-detail-plot', traces, {
+            template: 'plotly_white', barmode: 'overlay', bargap: 0,
+            xaxis: { title: 'Sample order' }, yaxis: { title: 'Hierarchy reachability distance' },
+            legend: { orientation: 'h' }, margin: { t: 20, l: 65, r: 20, b: 65 }
+        }, { responsive: true, displaylogo: false }));
+        $('#hierarchyDetailModal').modal('show');
+    }
+    document.getElementById('inspect-hierarchy')?.addEventListener('click', () => inspectHierarchy(Number(document.getElementById('inspect-mpts').value)));
+    window.exportSelectedBranchesCSV = async () => {
+        if (!results) return alert('Run or load an analysis before exporting.');
+        try {
+            clearTimeout(timer);
+            if (modeSelect?.value === 'threshold') await enqueuePartition(document.getElementById('meta-dendrogram').layout.shapes[0].y0);
+            await pendingCut;
+            const response = await fetch('/export_branches_csv', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mpts_list: selected.size ? window.getSelectedMpts() : Object.values(analysis.medoids || {}) }) });
+            if (!response.ok) throw new Error((await response.json()).error);
+            const url = URL.createObjectURL(await response.blob()), link = document.createElement('a');
+            link.href = url; link.download = 'mustache_clusters.csv'; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+        } catch (error) { alert('Export error: ' + error.message); }
+    };
 });

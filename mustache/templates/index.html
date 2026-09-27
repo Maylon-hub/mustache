@@ -6,7 +6,12 @@
     <div class="pane pane-top card">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap py-2">
             <div class="d-flex align-items-center flex-wrap">
-                <span class="mr-3 font-weight-bold"><i class="fas fa-sitemap mr-1"></i> Dendrogram</span>
+                <span class="mr-3 font-weight-bold"><i class="fas fa-sitemap mr-1"></i> Meta-Hierarchy Dendrogram</span>
+                <select id="meta-selection-mode" class="form-control form-control-sm mr-2" style="width:auto;" aria-label="Meta-cluster selection">
+                    <option value="automatic">Automatic meta-clustering</option>
+                    <option value="threshold">Distance threshold</option>
+                    <option value="manual">Manual meta-clusters</option>
+                </select>
                 <!-- Interactive Toolbar inspired by Legacy 2017 -->
                 <div class="btn-group btn-group-sm mr-2 my-1" role="group" aria-label="Tools">
                     <button id="btn-tool-wand" type="button" class="btn btn-light border active"
@@ -65,7 +70,7 @@
         <!-- Bottom Left: HAI Matrix -->
         <div class="pane pane-bottom-left card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-th mr-1"></i> HAI Plot</span>
+                <span><i class="fas fa-th mr-1"></i> HAI Similarity Matrix</span>
                 <select id="hai-scale-mode" class="form-control form-control-sm" style="width:auto; font-size:0.75rem;" title="HAI color scale">
                     <option value="adaptive">Full adaptive range</option>
                     <option value="robust">Robust contrast</option>
@@ -73,6 +78,7 @@
                 </select>
             </div>
             <div class="card-body p-0">
+                <div id="hai-method-note" class="small text-muted px-3 pt-2" role="status"></div>
                 <div id="hai-heatmap" style="height: 400px; width: 100%;"></div>
             </div>
         </div>
@@ -86,7 +92,9 @@
             </div>
             <div class="card-body p-0">
                 <!-- We will append multiple reachability plots here side-by-side -->
-                <div id="reachability-container" class="d-flex" style="overflow-x: auto; height: 400px;">
+                <p class="small text-muted px-3 pt-2 mb-1">Representative hierarchy (medoid): the mpts minimizing the sum of 1 − HAI within each meta-cluster. Automatic meta-clustering outliers are shown separately.</p>
+                <div class="px-3 pb-2 d-flex align-items-center"><label for="inspect-mpts" class="small mb-0 mr-2">Inspect any hierarchy:</label><select id="inspect-mpts" class="form-control form-control-sm mr-2" style="width:auto;" aria-label="Hierarchy mpts"></select><button type="button" id="inspect-hierarchy" class="btn btn-sm btn-outline-secondary">Open detailed plot</button></div>
+                <div id="reachability-container" class="d-flex" style="overflow-x: auto; height: 420px;">
                     <!-- JS will populate individual reachability plots -->
                     <div class="text-muted p-3">Run Batch Analysis to generate meta-clusters.</div>
                 </div>
@@ -111,7 +119,11 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label>Dataset (CSV) <span class="required">*</span></label>
-                                <input type="file" class="form-control-file" name="file" {% if not sample_dataset %}required{% endif %}>
+                                <input type="file" class="form-control-file" name="file" {% if sample_dataset %}disabled{% else %}required{% endif %}>
+                                <label class="mt-2" for="csv-header">CSV header</label>
+                                <select name="csv_header" id="csv-header" class="form-control form-control-sm">
+                                    <option value="auto">Detect automatically</option><option value="present">First row contains column names</option><option value="absent">All rows contain samples</option>
+                                </select>
                                 {% if sample_dataset %}
                                 <input type="hidden" name="sample_dataset" value="{{ sample_dataset }}">
                                 <div class="alert alert-success py-2 mt-2 mb-0">
@@ -124,8 +136,8 @@
                             <div class="form-group">
                                 <label>Algorithm</label>
                                 <select class="form-control" name="algorithm" data-mustache-setting="algorithm">
-                                    <option value="core-sg">Core-SG</option>
-                                    <option value="hdbscan">HDBSCAN</option>
+                                    <option value="core-sg" selected>CORE-SG (main engine)</option>
+                                    <option value="hdbscan">HDBSCAN (comparison baseline)</option>
                                 </select>
                             </div>
                         </div>
@@ -134,25 +146,32 @@
                     <div class="row">
                         <div class="col-md-4">
                             <div class="form-group">
-                                <label>Min <code>mpts</code></label>
+                                <label>Minimum <code>mpts</code></label>
                                 <input type="number" class="form-control" name="min_mpts" value="2" min="2"
                                     data-mustache-setting="min_mpts">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="form-group">
-                                <label>Max <code>mpts</code></label>
+                                <label>Maximum <code>mpts</code></label>
                                 <input type="number" class="form-control" name="max_mpts" value="50" min="2"
                                     data-mustache-setting="max_mpts">
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="form-group">
-                                <label>Step Size</label>
+                                <label>Step size</label>
                                 <input type="number" class="form-control" name="step" value="2" min="1"
                                     data-mustache-setting="step">
                             </div>
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="batch-metric">Distance metric</label>
+                        <select id="batch-metric" class="form-control" name="metric" data-mustache-setting="metric">
+                            {% for metric in supported_metrics['core-sg'] %}<option value="{{ metric }}">{{ metric }}{% if metric == 'minkowski' %} (p = 2){% endif %}</option>{% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Applied to clustering and hierarchy distances. Cosine requires non-zero vectors. Minkowski uses p = 2.</small>
                     </div>
                     <div class="text-right mt-3">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -172,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => openBatchConfigModal());
 <script>
     // Auto-load saved project when page opens with ?project_id=
     document.addEventListener('DOMContentLoaded', async () => {
-        const projectId = "{{ project_id }}";
+        const projectId = {{ project_id | tojson }};
         if (!projectId) return;
 
         // Show loading indicator
@@ -182,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => openBatchConfigModal());
         }
 
         try {
-            const res = await fetch(`/api/projects/${projectId}/data`);
+            const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/data`);
             if (!res.ok) throw new Error('Project not found');
             const data = await res.json();
 
@@ -193,15 +212,10 @@ document.addEventListener('DOMContentLoaded', () => openBatchConfigModal());
             // Restore analysis globals (accessed via main.js DOMContentLoaded scope)
             // We dispatch a custom event that main.js listens for
             const event = new CustomEvent('mustache:project-loaded', {
-                detail: { analysis, results, metadata: meta }
+                detail: { analysis, results, metadata: meta, params: data.params || {} }
             });
             document.dispatchEvent(event);
 
-            // Update sidebar info
-            const projName = document.getElementById('proj-name');
-            const projTime = document.getElementById('proj-min-mpts');
-            if (projName) projName.innerText = meta.name || 'Loaded Project';
-            if (projTime) projTime.innerText = meta.mpts_min || '-';
 
             // Reveal save buttons
             const sidebarSaveBtn = document.getElementById('btn-sidebar-save');
@@ -211,9 +225,14 @@ document.addEventListener('DOMContentLoaded', () => openBatchConfigModal());
 
         } catch (err) {
             console.error('Failed to load project:', err);
-            if (dendroDiv) dendroDiv.innerHTML = '<div class="text-danger p-3"><i class="fas fa-exclamation-triangle mr-2"></i> Failed to load saved project: ' + err.message + '</div>';
+            if (dendroDiv) {
+                dendroDiv.classList.add('text-danger', 'p-3');
+                dendroDiv.textContent = 'Failed to load saved project: ' + err.message;
+            }
         }
     });
 </script>
 {% endif %}
+{% if request.args.get('configure') == '1' %}<script>document.addEventListener('DOMContentLoaded', () => openBatchConfigModal());</script>{% endif %}
+<script>window.mustacheSupportedMetrics = {{ supported_metrics | tojson }};</script>
 {% endblock %}

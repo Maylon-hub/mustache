@@ -8,23 +8,29 @@
     <form id="settings-form" style="max-width: 560px;">
         <div class="form-row">
             <div class="form-group col-md-4">
-                <label for="setting-min-mpts">Min mpts</label>
+                <label for="setting-min-mpts">Minimum mpts</label>
                 <input id="setting-min-mpts" class="form-control" name="min_mpts" type="number" value="2" min="2" required>
             </div>
             <div class="form-group col-md-4">
-                <label for="setting-max-mpts">Max mpts</label>
+                <label for="setting-max-mpts">Maximum mpts</label>
                 <input id="setting-max-mpts" class="form-control" name="max_mpts" type="number" value="50" min="2" required>
             </div>
             <div class="form-group col-md-4">
-                <label for="setting-step">Step</label>
+                <label for="setting-step">Step size</label>
                 <input id="setting-step" class="form-control" name="step" type="number" value="2" min="1" required>
             </div>
         </div>
         <div class="form-group">
+            <label for="setting-metric">Distance metric</label>
+            <select id="setting-metric" class="form-control" name="metric">
+                {% for metric in supported_metrics['core-sg'] %}<option value="{{ metric }}">{{ metric }}{% if metric == 'minkowski' %} (p = 2){% endif %}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
             <label for="setting-algorithm">Default algorithm</label>
             <select id="setting-algorithm" class="form-control" name="algorithm">
-                <option value="core-sg" selected>Core-SG</option>
-                <option value="hdbscan">HDBSCAN</option>
+                <option value="core-sg" selected>CORE-SG (main engine)</option>
+                <option value="hdbscan">HDBSCAN (comparison baseline)</option>
             </select>
         </div>
         <div class="form-group">
@@ -45,7 +51,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const key = 'mustache.settings.v1';
-    const defaults = { min_mpts: 2, max_mpts: 50, step: 2, algorithm: 'core-sg', hai_scale: 'adaptive' };
+    const defaults = { min_mpts: 2, max_mpts: 50, step: 2, algorithm: 'core-sg', metric: 'euclidean', hai_scale: 'adaptive' };
     let settings = defaults;
     try { settings = { ...defaults, ...JSON.parse(localStorage.getItem(key) || '{}') }; } catch (_) {}
     const form = document.getElementById('settings-form');
@@ -60,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
         values.max_mpts = Number(values.max_mpts);
         values.step = Number(values.step);
         if (values.max_mpts < values.min_mpts) {
-            document.getElementById('settings-saved').textContent = 'Max mpts must be at least Min mpts.';
+            document.getElementById('settings-saved').textContent = 'Maximum mpts must be at least Minimum mpts.';
             return;
         }
         localStorage.setItem(key, JSON.stringify(values));

@@ -4,6 +4,7 @@ import time
 from .core import run_clustering
 from .core.batch import run_batch_clustering
 from .core import storage
+from .core.validation import SUPPORTED_METRICS
 from scipy.cluster.hierarchy import fcluster
 
 import io
@@ -31,12 +32,14 @@ def index():
         })
     project_id = request.args.get('project_id', '')
     sample_dataset = request.args.get('sample_dataset', '')
-    return render_template('index.html', project_id=project_id, sample_dataset=sample_dataset)
+    return render_template('index.html', project_id=project_id, sample_dataset=sample_dataset, supported_metrics=SUPPORTED_METRICS)
 
 @main.route('/datasets')
 def datasets_page():
     from .core.sample_datasets import list_datasets
-    return render_template('datasets.html', datasets=list_datasets())
+    query = request.args.get('q', '').strip().lower()
+    datasets = [item for item in list_datasets() if query in (item['name'] + ' ' + item['description']).lower()]
+    return render_template('datasets.html', datasets=datasets)
 
 @main.route('/api/datasets/<dataset_key>/csv')
 def sample_dataset_csv(dataset_key):
@@ -57,11 +60,30 @@ def projects_page():
 
 @main.route('/dashboard')
 def dashboard():
-    return render_template('dashboard.html')
+    # Historical alternate page had disconnected single/batch handlers.
+    # Keep its URL working through the canonical explorer.
+    from flask import redirect, url_for
+    return redirect(url_for('main.index'))
 
 @main.route('/settings')
 def settings():
-    return render_template('settings.html')
+    return render_template('settings.html', supported_metrics=SUPPORTED_METRICS)
+
+
+def read_csv_upload(file, header_mode='auto'):
+    """Infer a numeric headerless CSV without dropping its first sample."""
+    if header_mode not in ('auto', 'present', 'absent'):
+        raise ValueError('CSV header must be auto, present or absent.')
+    if header_mode == 'present':
+        return pd.read_csv(file)
+    frame = pd.read_csv(file, header=None)
+    if header_mode == 'absent':
+        return frame
+    first = pd.to_numeric(frame.iloc[0], errors='coerce')
+    if first.notna().all():
+        return frame.apply(pd.to_numeric, errors='raise')
+    file.seek(0)
+    return pd.read_csv(file)
 
 @main.route('/api/session_status')
 def session_status():
@@ -79,7 +101,10 @@ def get_projects():
 def save_project_route():
     data = request.get_json() or {}
     name = data.get('name', 'My Analysis')
-    selected_mpts = [int(value) for value in data.get('selected_mpts', [])]
+    try:
+        selected_mpts = [int(value) for value in data.get('selected_mpts', SESSION_DATA.get('selected_mpts', []))]
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Selected mpts values must be integers.'}), 400
     
     results = SESSION_DATA.get('results')
     params = SESSION_DATA.get('params', {})
@@ -87,6 +112,8 @@ def save_project_route():
     
     if results is None:
         return jsonify({'error': 'No active analysis to save.'}), 400
+    if any(str(value) not in results for value in selected_mpts):
+        return jsonify({'error': 'Selected mpts values do not belong to this analysis.'}), 400
         
     analysis = {
         'meta_linkage': SESSION_DATA.get('meta_linkage').tolist() if isinstance(SESSION_DATA.get('meta_linkage'), np.ndarray) else SESSION_DATA.get('meta_linkage'),
@@ -99,6 +126,11 @@ def save_project_route():
         'hai_computation': SESSION_DATA.get('hai_computation'),
         'selected_mpts': selected_mpts
     }
+    analysis['selection_mode'] = SESSION_DATA.get('selection_mode', 'automatic')
+    analysis['cut_threshold'] = SESSION_DATA.get('cut_threshold')
+    analysis['times'] = SESSION_DATA.get('times', {})
+    analysis['automatic_partition'] = SESSION_DATA.get('automatic_partition')
+    analysis['manual_groups'] = SESSION_DATA.get('manual_groups', [])
     
     meta = storage.save_project(name, params, analysis, results, raw_df)
     return jsonify({'success': True, 'project': meta})
@@ -118,13 +150,22 @@ def get_project_data(project_id):
         SESSION_DATA['results'] = results
         SESSION_DATA['raw_data'] = raw_df
         SESSION_DATA['params'] = params
-        SESSION_DATA['dataset_name'] = data.get('metadata', {}).get('name', 'dataset')
+        SESSION_DATA['dataset_name'] = params.get('dataset_name') or data.get('metadata', {}).get('name', 'dataset')
         SESSION_DATA['cut_cache'] = {}
         SESSION_DATA['last_medoids'] = analysis.get('medoids', {})
+        SESSION_DATA['meta_labels'] = analysis.get('meta_labels')
+        SESSION_DATA['selection_mode'] = analysis.get('selection_mode', 'automatic')
+        SESSION_DATA['cut_threshold'] = analysis.get('cut_threshold')
+        SESSION_DATA['times'] = analysis.get('times', {})
+        SESSION_DATA['automatic_partition'] = analysis.get('automatic_partition') or ({
+            'meta_labels': analysis.get('meta_labels'), 'medoids': analysis.get('medoids'),
+            'outliers': analysis.get('outliers', []),
+        } if analysis.get('selection_mode', 'automatic') == 'automatic' else None)
         SESSION_DATA['outliers'] = analysis.get('outliers', [])
         SESSION_DATA['meta_dendrogram_json'] = analysis.get('meta_dendrogram_json')
         SESSION_DATA['hai_computation'] = analysis.get('hai_computation')
         SESSION_DATA['selected_mpts'] = analysis.get('selected_mpts', [])
+        SESSION_DATA['manual_groups'] = analysis.get('manual_groups', [])
         
         return jsonify({
             'metadata': data.get('metadata'),
@@ -166,7 +207,7 @@ def upload_file():
         
     try:
         # Read CSV with header inference
-        df = pd.read_csv(file)
+        df = read_csv_upload(file, request.form.get('csv_header', 'auto'))
         
         # Ensure we only have numeric data for clustering
         df_numeric = df.select_dtypes(include=[np.number])
@@ -203,6 +244,8 @@ def upload_file():
             'preview': df.head().to_dict(orient='records')
         })
         
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -212,6 +255,8 @@ def batch_process():
     file = request.files.get('file')
     if not sample_dataset and (file is None or file.filename == ''):
         return jsonify({'error': 'Select a CSV file or a sample dataset.'}), 400
+    if sample_dataset and file is not None and file.filename:
+        return jsonify({'error': 'Select either a sample dataset or a CSV file, not both.'}), 400
         
     start_time = time.time()
     try:
@@ -221,7 +266,7 @@ def batch_process():
             dataset_name = dataset_info.name
         else:
             # Read CSV with header inference
-            df = pd.read_csv(file)
+            df = read_csv_upload(file, request.form.get('csv_header', 'auto'))
             dataset_name = file.filename
         
         # Validate numeric data
@@ -246,6 +291,9 @@ def batch_process():
         # Run meta-analysis
         from .core.batch import analyze_batch_results
         analysis = analyze_batch_results(results)
+        exec_time = round(time.time() - start_time, 4)
+        analysis['selection_mode'] = 'automatic'
+        analysis['cut_threshold'] = None
         
         # Store for dynamic cuts and export
         SESSION_DATA['meta_linkage'] = analysis.get('meta_linkage')
@@ -257,6 +305,11 @@ def batch_process():
         SESSION_DATA['meta_dendrogram_json'] = analysis.get('meta_dendrogram_json')
         SESSION_DATA['hai_computation'] = analysis.get('hai_computation')
         SESSION_DATA['selected_mpts'] = []
+        SESSION_DATA['manual_groups'] = []
+        SESSION_DATA['selection_mode'] = 'automatic'
+        SESSION_DATA['cut_threshold'] = None
+        SESSION_DATA['times'] = analysis.get('times', {})
+        SESSION_DATA['automatic_partition'] = {key: analysis[key] for key in ('meta_labels', 'medoids', 'outliers')}
         SESSION_DATA['results'] = results
         SESSION_DATA['raw_data'] = df
         SESSION_DATA['cut_cache'] = {}
@@ -268,22 +321,26 @@ def batch_process():
             'metric': metric,
             'algorithm': algorithm
         }
+        SESSION_DATA['params'].update(dataset_name=dataset_name, n_samples=len(df), execution_time=exec_time)
+        SESSION_DATA['params']['csv_header'] = request.form.get('csv_header', 'auto') if not sample_dataset else 'present'
         
         # Remove meta_linkage from JSON response since we don't need to send the large matrix
         if 'meta_linkage' in analysis:
             del analysis['meta_linkage']
         
-        exec_time = round(time.time() - start_time, 2)
         
         return jsonify({
             'message': 'Batch clustering successful',
             'range': {'min': min_mpts, 'max': max_mpts, 'step': step},
             'results': results,
             'analysis': analysis,
-            'execution_time': exec_time
+            'execution_time': exec_time,
+            'params': SESSION_DATA['params']
         })
 
         
+    except (ValueError, KeyError) as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -292,8 +349,38 @@ def batch_process():
 @main.route('/cut_dendrogram', methods=['POST'])
 def cut_dendrogram():
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+        if data.get('mode') == 'manual':
+            ordered = SESSION_DATA.get('ordered_mpts')
+            hai = SESSION_DATA.get('hai_matrix')
+            if ordered is None or hai is None:
+                return jsonify({'error': 'No active batch session found.'}), 400
+            groups = data.get('groups', [])
+            if not isinstance(groups, list) or any(not isinstance(group, list) or not group for group in groups):
+                return jsonify({'error': 'Manual meta-clusters must be a list of non-empty mpts groups.'}), 400
+            flattened = [value for group in groups for value in group]
+            if any(not isinstance(value, int) or isinstance(value, bool) or value not in ordered for value in flattened) or len(set(flattened)) != len(flattened):
+                return jsonify({'error': 'Manual groups must contain valid, non-overlapping mpts values.'}), 400
+            labels = np.full(len(ordered), -1, dtype=int)
+            for group_id, group in enumerate(groups):
+                labels[[ordered.index(value) for value in group]] = group_id
+            from .core.hai import compute_medoids
+            medoids = {group: ordered[index] for group, index in compute_medoids(np.array(hai), labels).items()}
+            payload = {'meta_labels': labels.tolist(), 'medoids': medoids, 'outliers': [],
+                       'selection_mode': 'manual', 'cut_threshold': None, 'manual_groups': groups,
+                       'unselected_count': len(ordered) - len(flattened), 'from_cache': False}
+            SESSION_DATA.update(meta_labels=labels.tolist(), last_medoids=medoids, outliers=[],
+                selection_mode='manual', cut_threshold=None, manual_groups=groups)
+            return jsonify(payload)
+        if data.get('mode') == 'automatic':
+            partition = SESSION_DATA.get('automatic_partition')
+            if not partition:
+                return jsonify({'error': 'This older project did not preserve its automatic meta-clustering partition.'}), 400
+            SESSION_DATA.update(meta_labels=partition['meta_labels'], last_medoids=partition['medoids'], outliers=partition['outliers'], selection_mode='automatic', cut_threshold=None)
+            return jsonify({**partition, 'selection_mode': 'automatic', 'cut_threshold': None, 'from_cache': False})
         y_threshold = float(data.get('y_threshold', 0.0))
+        if not np.isfinite(y_threshold) or y_threshold < 0:
+            return jsonify({'error': 'Cut threshold must be a finite non-negative distance.'}), 400
         
         Z = SESSION_DATA.get('meta_linkage')
         hai_matrix = SESSION_DATA.get('hai_matrix')
@@ -304,18 +391,20 @@ def cut_dendrogram():
         
         Z_arr = np.asarray(Z)
         # Discretize height intervals to cache identical partitions
-        heights = np.sort(np.unique(Z_arr[:, 2]))
-        interval_idx = int(np.searchsorted(heights, y_threshold))
+        heights = np.sort(np.unique(Z_arr[:, 2])) if Z_arr.size else np.array([])
+        interval_idx = int(np.searchsorted(heights, y_threshold, side='right'))
         
         cut_cache = SESSION_DATA.setdefault('cut_cache', {})
         if interval_idx in cut_cache:
             # Instant return from memory cache
             cached = dict(cut_cache[interval_idx])
             cached['from_cache'] = True
+            cached['cut_threshold'] = y_threshold
+            SESSION_DATA.update(meta_labels=cached['meta_labels'], last_medoids=cached['medoids'], outliers=[], selection_mode='threshold', cut_threshold=y_threshold)
             return jsonify(cached)
 
         # Compute cluster labels using fcluster
-        labels = fcluster(Z_arr, t=y_threshold, criterion='distance')
+        labels = fcluster(Z_arr, t=y_threshold, criterion='distance') if Z_arr.size else np.array([1])
         
         from .core.hai import compute_medoids
         medoids_map = compute_medoids(np.array(hai_matrix), labels)
@@ -329,11 +418,14 @@ def cut_dendrogram():
             'meta_labels': labels.tolist(),
             'medoids': medoids_mpts,
             'interval_idx': interval_idx,
-            'from_cache': False
+            'from_cache': False,
+            'outliers': [], 'selection_mode': 'threshold', 'cut_threshold': y_threshold
         }
         cut_cache[interval_idx] = result_payload
-        SESSION_DATA['last_medoids'] = medoids_mpts
+        SESSION_DATA.update(last_medoids=medoids_mpts, meta_labels=labels.tolist(), outliers=[], selection_mode='threshold', cut_threshold=y_threshold)
         return jsonify(result_payload)
+    except (TypeError, ValueError) as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         import traceback
         traceback.print_exc()

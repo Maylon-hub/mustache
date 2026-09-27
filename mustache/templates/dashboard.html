@@ -73,7 +73,7 @@
             </div>
             <div class="col-lg-6" id="map-panel">
                 <div class="card mb-4">
-                    <div class="card-header"><i class="fas fa-map"></i> 2D Projection (t-SNE/UMAP)</div>
+                    <div class="card-header"><i class="fas fa-map"></i> 2D visualization (t-SNE)</div>
                     <div class="card-body p-0">
                         <div id="map-plot" style="height: 400px; width: 100%;"></div>
                     </div>
@@ -126,8 +126,8 @@
                                     <div class="form-group">
                                         <label>Algorithm</label>
                                         <select class="form-control" name="algorithm">
-                                            <option value="hdbscan">HDBSCAN</option>
-                                            <option value="core-sg">Core-SG</option>
+                                            <option value="core-sg" selected>CORE-SG (main engine)</option>
+                                            <option value="hdbscan">HDBSCAN (comparison baseline)</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
@@ -157,8 +157,8 @@
                     <div class="tab-pane fade" id="batch-conf" role="tabpanel">
                         <form id="batch-form" enctype="multipart/form-data">
                             <div class="alert alert-light border">
-                                <i class="fas fa-info-circle"></i> Batch mode runs HDBSCAN multiple times with varying
-                                parameters to find stable meta-clusters.
+                                <i class="fas fa-info-circle"></i> The CORE-SG batch builds reusable support once,
+                                extracts hierarchies across mpts values and compares them using HAI.
                             </div>
                             <div class="row">
                                 <div class="col-md-6">
@@ -171,8 +171,8 @@
                                     <div class="form-group">
                                         <label>Algorithm</label>
                                         <select class="form-control" name="algorithm">
-                                            <option value="hdbscan">HDBSCAN</option>
-                                            <option value="core-sg">Core-SG</option>
+                                            <option value="core-sg" selected>CORE-SG (main engine)</option>
+                                            <option value="hdbscan">HDBSCAN (comparison baseline)</option>
                                         </select>
                                     </div>
                                 </div>

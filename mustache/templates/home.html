@@ -219,7 +219,7 @@
         <div class="col-xl-3 col-lg-4 col-md-6 mb-4">
             <div class="project-card">
                 <div class="project-card-header">
-                    <h5 class="project-card-title text-truncate" title="${p.name}">${p.name}</h5>
+                    <h5 class="project-card-title text-truncate" title="${escapeHTML(p.name)}">${escapeHTML(p.name)}</h5>
                     <span class="badge badge-dark" style="font-size:0.7rem; font-weight:600; letter-spacing:0.5px;">${p.status || 'COMPLETED'}</span>
                 </div>
                 <div class="project-card-body">
@@ -235,23 +235,23 @@
                     </div>
                     <div class="row">
                         <div class="col-6">
-                            <div class="project-meta-label">Distance</div>
-                            <div class="project-meta-value">${p.distance || 'EUCLIDEAN'}</div>
+                            <div class="project-meta-label">Distance metric</div>
+                            <div class="project-meta-value">${escapeHTML(p.distance || '—')}</div>
                         </div>
                         <div class="col-6">
                             <div class="project-meta-label">Algorithm</div>
-                            <div class="project-meta-value font-weight-bold text-primary">${p.algorithm || 'CORE-SG'}</div>
+                            <div class="project-meta-value font-weight-bold text-primary">${escapeHTML(p.algorithm || '—')}</div>
                         </div>
                     </div>
-                    <div class="project-meta-label">mpts min/max</div>
-                    <div class="project-meta-value">${p.mpts_min} / ${p.mpts_max} (step ${p.step || 1})</div>
+                    <div class="project-meta-label">Minimum / Maximum mpts</div>
+                    <div class="project-meta-value">${p.mpts_min ?? '—'} / ${p.mpts_max ?? '—'} (step size ${p.step ?? '—'})</div>
                 </div>
                 <div class="project-card-footer">
                     <div>
                         <a href="/api/projects/${p.id}/export_zip" class="btn btn-sm btn-link text-muted p-0 mr-3" title="Export as ZIP">
                             <i class="fas fa-file-archive text-info mr-1"></i> Export Zip
                         </a>
-                        <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteProject('${p.id}', '${p.name}')" title="Delete Project">
+                        <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteProject('${p.id}')" title="Delete Project">
                             <i class="fas fa-trash-alt mr-1"></i> Delete
                         </button>
                     </div>
@@ -282,7 +282,14 @@
         window.location.href = `/?project_id=${id}`;
     }
 
+    function escapeHTML(value) {
+        const element = document.createElement('span');
+        element.textContent = String(value ?? '');
+        return element.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     async function deleteProject(id, name) {
+        name = allProjects.find(project => project.id === id)?.name || id;
         if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
         try {
             const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
