@@ -3,56 +3,37 @@ import numpy as np
 import pandas as pd
 import time
 from .clustering import run_clustering
-from scipy.cluster.hierarchy import linkage, dendrogram as sp_dendrogram
-from scipy.spatial.distance import squareform
-from sklearn.cluster import HDBSCAN
+from .validation import numeric_data, validate_metric, validate_range
 
 def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algorithm='core-sg'):
     """
-    Runs HDBSCAN for a range of mpts values.
+    Build each requested hierarchy, reusing CORE-SG support once per batch.
     Returns a dictionary where keys are mpts values and values are clustering results.
     """
     results = {}
     
     # Ensure numerical data
-    data = df.select_dtypes(include=[np.number])
-    data_np = data.to_numpy()
+    validate_metric(algorithm, metric)
+    data_np = numeric_data(df, metric)
+    validate_range(min_mpts, max_mpts, step, len(data_np))
     
-    # Precompute OPTICS once for the entire batch
-    t_opt_start = time.time()
-    from sklearn.cluster import OPTICS
-    # Use min_mpts or default 5 for stable density layout
-    optics_samples = max(min_mpts, 5)
-    optics_model = OPTICS(min_samples=optics_samples, metric=metric)
-    optics_model.fit(data_np)
-    optics_time_total = time.time() - t_opt_start
-    
-    # Amortize timing for report clarity
     n_iters = max(1, len(range(min_mpts, max_mpts + 1, step)))
-    amortized_optics_time = optics_time_total / n_iters
-    precomputed_optics = (optics_model.reachability_, optics_model.ordering_, amortized_optics_time)
 
     # For Core-SG: Build the support graph ONCE up to k_max = max_mpts (ICDE 2022)
-    # Then extract each hierarchy for k <= k_max in milliseconds.
+    # Then extract each hierarchy for k <= k_max from that same support.
     core_model = None
     amortized_core_fit_time = 0.0
     if algorithm == 'core-sg':
-        try:
-            from core_sg import CoreSG
-            t_core_start = time.time()
-            core_model = CoreSG(metric=metric)
-            core_model.fit(data_np, k_max=int(max_mpts))
-            core_fit_time = time.time() - t_core_start
-            amortized_core_fit_time = core_fit_time / n_iters
-        except Exception as e:
-            print(f"Warning: Failed to pre-fit CoreSG graph in batch: {e}. Falling back to standard execution.")
-            core_model = None
-            amortized_core_fit_time = 0.0
+        from core_sg import CoreSG
+        t_core_start = time.perf_counter()
+        core_model = CoreSG(metric=metric, p=2, no_noise=False)
+        core_model.fit(data_np, k_max=int(max_mpts))
+        amortized_core_fit_time = (time.perf_counter() - t_core_start) / n_iters
 
     # Loop through mpts range
     for mpts in range(min_mpts, max_mpts + 1, step):
-        # We use mpts for both min_cluster_size and min_samples mimicking legacy behavior
-        # where 'mpts' controlled the scale.
+        # Modern batch policy ties minimum cluster size to the density mpts.
+        # The legacy form exposed these independently; see the scientific guide.
         
         # Run clustering for this specific mpts
         try:
@@ -62,7 +43,6 @@ def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algor
                 min_samples=mpts, 
                 metric=metric, 
                 algorithm=algorithm,
-                precomputed_optics=precomputed_optics,
                 core_model=core_model,
                 precomputed_projection=None,
                 extra_clustering_time=amortized_core_fit_time,
@@ -70,8 +50,7 @@ def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algor
             )
             results[str(mpts)] = cluster_result
         except Exception as e:
-            print(f"Skipping mpts={mpts}: {str(e)}")
-            continue
+            raise RuntimeError(f"Batch failed at mpts={mpts}: {e}") from e
 
         
     return results
@@ -89,17 +68,21 @@ def analyze_batch_results(batch_results):
     # batch_results is a dict {mpts: result_dict}
     # Sort keys to ensure consistent matrix order
     sorted_keys = sorted(batch_results.keys(), key=lambda x: int(x))
+    if not sorted_keys:
+        raise ValueError('No hierarchies are available for HAI analysis.')
     
     linkage_list = []
     n_samples = 0
     
     total_optics_time = 0.0
     total_clustering_time = 0.0
+    total_reachability_time = 0.0
     
     for key in sorted_keys:
         result = batch_results[key]
         total_optics_time += result.get('optics_time', 0.0)
         total_clustering_time += result.get('clustering_time', 0.0)
+        total_reachability_time += result.get('reachability_time', 0.0)
         
         if 'linkage_z' in result:
             Z = np.array(result['linkage_z'])
@@ -107,10 +90,10 @@ def analyze_batch_results(batch_results):
             # Infer n_samples from linkage size (N-1 merges) => N = len(Z) + 1
             if n_samples == 0:
                 n_samples = len(Z) + 1
+            elif len(Z) + 1 != n_samples:
+                raise ValueError('All HAI hierarchies must refer to the same samples.')
         else:
-            # Handle error/missing data?
-            print(f"Warning: No linkage_z for mpts={key}")
-            pass
+            raise ValueError(f'Missing hierarchy for mpts={key}; matrix ordering cannot be preserved.')
             
     if not linkage_list:
         return {'error': 'No valid linkage matrices found'}
@@ -142,7 +125,7 @@ def analyze_batch_results(batch_results):
                 hovertemplate='mpts %{text}<extra></extra>'
             )])
             fig_meta_dendro.update_layout(
-                template='plotly_white', title='Meta-Clustering Dendrogram (single hierarchy)',
+                template='plotly_white', title='Meta-Hierarchy Dendrogram (single hierarchy)',
                 xaxis=dict(visible=False), yaxis=dict(title='Distance (1 - HAI)', range=[0, 1]),
                 margin=dict(l=50, r=20, t=50, b=60), hovermode=False
             )
@@ -158,16 +141,23 @@ def analyze_batch_results(batch_results):
             # X-axis tick positions: scipy places leaves at 5, 15, 25, ... (10 apart)
             n_leaves = len(leaf_labels)
             tick_vals = [10 * i + 5 for i in range(n_leaves)]
+            # U-shape endpoints are subtree centres, NOT outer leaf bounds.
+            # Recover true membership from linkage children to avoid excluding
+            # outer leaves when clicking an internal branch.
+            positions = {int(leaf): tick_vals[i] for i, leaf in enumerate(ddict['leaves'])}
+            members = {i: [int(sorted_keys[i])] for i in range(n_leaves)}
+            branch_members = {}
+            for i, row in enumerate(Z):
+                left, right = int(row[0]), int(row[1])
+                xs_pair = tuple(sorted((positions[left], positions[right])))
+                members[n_leaves + i] = members[left] + members[right]
+                positions[n_leaves + i] = sum(xs_pair) / 2
+                branch_members[(xs_pair[0], xs_pair[1], float(row[2]))] = members[n_leaves + i]
 
             # Build one Scatter trace per branch (each row of icoord/dcoord is one U-shape)
             traces = []
             for branch_index, (xs, ys) in enumerate(zip(icoord.tolist(), dcoord.tolist())):
-                branch_min_x, branch_max_x = min(xs), max(xs)
-                branch_mpts = [
-                    int(label)
-                    for position, label in zip(tick_vals, leaf_labels)
-                    if branch_min_x <= position <= branch_max_x
-                ]
+                branch_mpts = sorted(branch_members[(min(xs), max(xs), max(ys))])
                 # Insert a point at the centre of the horizontal segment. Plotly
                 # click events are point-based, so this makes the visible branch
                 # reliably clickable without changing its geometry.
@@ -190,7 +180,7 @@ def analyze_batch_results(batch_results):
                 ))
         
             layout = go.Layout(
-                template='plotly_white', title='Meta-Clustering Dendrogram (Hierarchies)',
+                template='plotly_white', title='Meta-Hierarchy Dendrogram',
                 xaxis=dict(tickvals=tick_vals, ticktext=leaf_labels, title='mpts Parameter', showgrid=False, zeroline=False),
                 yaxis=dict(title='Distance (1 - HAI)', showgrid=True, zeroline=True, rangemode='tozero'),
                 margin=dict(l=50, r=20, t=50, b=60), hovermode=False
@@ -231,7 +221,7 @@ def analyze_batch_results(batch_results):
     print("           MUSTACHE V2 TIMING PROFILE REPORT")
     print("="*50)
     print(f"1. Core Clustering Runs Time ({algo_used}): {total_clustering_time:.4f}s")
-    print(f"2. Reachability Plots Runs Time (OPTICS):      {total_optics_time:.4f}s")
+    print(f"2. Hierarchy Reachability Build Time:         {total_reachability_time:.4f}s")
     print(f"3. HAI Similarity Matrix Computation Time:      {hai_time:.4f}s")
     print(f"4. Meta-Clustering & Dendrogram Build Time:    {dendrogram_time:.4f}s")
     print(f"5. Medoids Selection Computation Time:          {medoids_time:.4f}s")
@@ -249,6 +239,7 @@ def analyze_batch_results(batch_results):
         'times': {
             'clustering_runs_time': round(total_clustering_time, 4),
             'optics_runs_time': round(total_optics_time, 4),
+            'reachability_time': round(total_reachability_time, 4),
             'hai_time': round(hai_time, 4),
             'dendrogram_time': round(dendrogram_time, 4),
             'medoids_time': round(medoids_time, 4)

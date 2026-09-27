@@ -1,7 +1,28 @@
 import numpy as np
 from sklearn.cluster import HDBSCAN
 from scipy.spatial.distance import pdist, squareform
-from scipy.cluster.hierarchy import leaves_list, to_tree, linkage
+from scipy.cluster.hierarchy import is_valid_linkage, linkage
+
+
+def _sizes_at_density_levels(Z, n_samples):
+    """Resolve arbitrary binary ordering of simultaneous (equal-height) merges.
+
+    A density level produces one cluster even when SciPy serializes its merge
+    as several binary nodes. All tied descendants inherit that cluster's size.
+    This preserves HAI under alternative MST tie-breaking of the same levels.
+    """
+    Z = np.asarray(Z, dtype=float)
+    sizes = np.ones(2 * n_samples - 1)
+    for i, row in enumerate(Z):
+        expected = sizes[int(row[0])] + sizes[int(row[1])]
+        if row[3] != expected:
+            raise ValueError('Linkage cluster cardinalities do not match their children.')
+        sizes[n_samples + i] = expected
+    for i in range(len(Z) - 1, -1, -1):
+        for child in Z[i, :2].astype(int):
+            if child >= n_samples and Z[child - n_samples, 2] == Z[i, 2]:
+                sizes[child] = sizes[n_samples + i]
+    return sizes
 
 def build_distance_matrix(Z, n_samples):
     """
@@ -10,6 +31,7 @@ def build_distance_matrix(Z, n_samples):
     Z structure: [idx1, idx2, distance, sample_count]
     """
     D = np.zeros((n_samples, n_samples))
+    level_sizes = _sizes_at_density_levels(Z, n_samples)
     
     # We need to track the members of each cluster.
     # Initial clusters are just the points themselves: 0..(n-1)
@@ -23,7 +45,7 @@ def build_distance_matrix(Z, n_samples):
         child1_idx = int(row[0])
         child2_idx = int(row[1])
         # row[3] is number of samples in the new cluster (size)
-        cluster_size = row[3]
+        cluster_size = level_sizes[new_cluster_idx]
         
         normalized_size = cluster_size / n_samples
         
@@ -65,7 +87,7 @@ def _build_lca_index(Z, n_samples):
     node_count = 2 * n_samples - 1
     parent = np.full(node_count, -1, dtype=np.int64)
     children = np.full((node_count, 2), -1, dtype=np.int64)
-    sizes = np.ones(node_count, dtype=np.float64)
+    sizes = _sizes_at_density_levels(Z, n_samples)
 
     for merge_index, row in enumerate(np.asarray(Z)):
         node = n_samples + merge_index
@@ -73,7 +95,6 @@ def _build_lca_index(Z, n_samples):
         children[node] = (left, right)
         parent[left] = node
         parent[right] = node
-        sizes[node] = float(row[3])
 
     root = node_count - 1
     parent[root] = root
@@ -116,7 +137,7 @@ def _sampled_hierarchy_values(Z, n_samples, left_points, right_points):
 
     lca = left.copy()
     lca[different] = ancestors[0, left[different]]
-    return (sizes[lca] / float(n_samples)).astype(np.float32)
+    return sizes[lca] / float(n_samples)
 
 
 def compute_hai_matrix(
@@ -129,9 +150,27 @@ def compute_hai_matrix(
     return_metadata=False,
 ):
     """
-    Computes the HAI matrix for a list of linkage structures.
+    HAI = 1 - 2/n² * sum(i<j) |d_H1(i,j) - d_H2(i,j)|.
+
+    d_H is the normalized size of the lowest common ancestor cluster. This is
+    the formula in legacy/resources/hai.pyx, not TED or a label validation score.
+    Inputs describe full single-linkage trees over the SAME indexed samples;
+    agreement on a legacy compact/pruned tree can differ (see user guide).
     """
     n_hierarchies = len(linkage_list)
+    if n_samples < 1 or not n_hierarchies:
+        raise ValueError('HAI requires at least one hierarchy and one sample.')
+    if sample_pairs < 1 or max_exact_samples < 1:
+        raise ValueError('HAI pair budget and exact threshold must be positive.')
+    for Z in linkage_list:
+        array = np.asarray(Z, dtype=float)
+        if array.size and (not np.isfinite(array).all() or np.any(array[:, :2] != np.floor(array[:, :2]))):
+            raise ValueError('HAI linkage must have finite values and integer node indices.')
+        if n_samples > 1:
+            is_valid_linkage(array, throw=True)
+        if len(Z) != n_samples - 1:
+            raise ValueError('HAI linkage sizes must match n_samples.')
+        _sizes_at_density_levels(Z, n_samples)
     hai_matrix = np.zeros((n_hierarchies, n_hierarchies))
     
     use_approximation = n_samples > max_exact_samples
@@ -153,7 +192,7 @@ def compute_hai_matrix(
     else:
         triangle = np.triu_indices(n_samples, k=1)
         hierarchy_values = [
-            build_distance_matrix(Z, n_samples)[triangle].astype(np.float32)
+            build_distance_matrix(Z, n_samples)[triangle]
             for Z in linkage_list
         ]
         normalization = 2.0 / (n_samples * n_samples)
@@ -175,8 +214,8 @@ def compute_hai_matrix(
                         np.sum(np.abs(hierarchy_values[i] - hierarchy_values[j]), dtype=np.float64)
                     )
             
-            hai_matrix[i, j] = score
-            hai_matrix[j, i] = score
+            hai_matrix[i, j] = np.clip(score, 0.0, 1.0)
+            hai_matrix[j, i] = hai_matrix[i, j]
             
     metadata = {
         'method': method,
@@ -186,6 +225,13 @@ def compute_hai_matrix(
         'random_state': int(random_state) if use_approximation else None,
         'confidence': 0.95 if use_approximation else 1.0,
         'absolute_error_bound': float(error_bound),
+        'error_bound_scope': 'per hierarchy comparison; not simultaneous over the matrix',
+        'sampling': 'uniform ordered distinct pairs with replacement; shared across hierarchies' if use_approximation else None,
+        'bit_generator': 'PCG64' if use_approximation else None,
+        'normalization': '2/n^2 sum over unordered pairs',
+        'hierarchy_representation': 'full-single-linkage',
+        'tie_policy': 'simultaneous equal-height merges form one density-level cluster',
+        'max_exact_samples': int(max_exact_samples),
     }
     return (hai_matrix, metadata) if return_metadata else hai_matrix
 
@@ -194,6 +240,11 @@ def run_meta_clustering(hai_matrix):
     Runs HDBSCAN on the HAI matrix (converted to distance).
     Returns labels and a linkage matrix (manually computed via scipy).
     """
+    hai_matrix = np.asarray(hai_matrix, dtype=float)
+    if hai_matrix.ndim != 2 or hai_matrix.shape[0] != hai_matrix.shape[1] or not len(hai_matrix):
+        raise ValueError('HAI must be a non-empty square matrix.')
+    if not np.isfinite(hai_matrix).all() or not np.allclose(hai_matrix, hai_matrix.T) or not np.allclose(np.diag(hai_matrix), 1) or np.any((hai_matrix < 0) | (hai_matrix > 1)):
+        raise ValueError('HAI must be finite, symmetric, in [0, 1], with unit diagonal.')
     if len(hai_matrix) == 1:
         return [0], []
 
@@ -202,12 +253,12 @@ def run_meta_clustering(hai_matrix):
     np.fill_diagonal(distance_matrix, 0)
     
     # Run HDBSCAN for labels (using sklearn version)
-    clusterer = HDBSCAN(metric='precomputed', min_cluster_size=2, allow_single_cluster=True, copy=True)
+    # Legacy run_hdbscan_hai uses mpts=1: no additional density smoothing
+    # of 1-HAI. sklearn counts self, so min_samples=1 induces single linkage.
+    clusterer = HDBSCAN(metric='precomputed', min_samples=1, min_cluster_size=2, allow_single_cluster=True, copy=True)
     clusterer.fit(distance_matrix)
     labels = clusterer.labels_
     
-    # Generate Linkage Matrix for Dendrogram using scipy (Hybrid Approach)
-    # This replaces the missing single_linkage_tree_ attribute in sklearn 1.3
     # Generate Linkage Matrix for Dendrogram using scipy (Hybrid Approach)
     # This replaces the missing single_linkage_tree_ attribute in sklearn 1.3
     condensed_dist = squareform(distance_matrix, checks=False)
@@ -219,8 +270,12 @@ def run_meta_clustering(hai_matrix):
 
 def compute_medoids(hai_matrix, labels):
     """
-    Identifies the medoid for each meta-cluster.
+    Minimize sum(1 - HAI) within each non-noise meta-cluster.
+    Ties select the first index (ordered_mpts is sorted in batch analysis).
     """
+    hai_matrix = np.asarray(hai_matrix, dtype=float)
+    if hai_matrix.shape != (len(labels), len(labels)):
+        raise ValueError('Meta labels must align with the square HAI matrix.')
     distance_matrix = 1.0 - hai_matrix
     unique_labels = np.unique(labels)
     medoids = {}
