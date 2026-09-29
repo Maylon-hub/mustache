@@ -1,0 +1,61 @@
+name: Manually promote validated artifacts to testpypi
+on:
+  workflow_dispatch:
+    inputs:
+      validation_run_id:
+        description: Successful RC validation run on this exact source SHA
+        required: true
+      confirm_version:
+        description: Exact package version; dispatch on the matching vVERSION tag
+        required: true
+      publish:
+        description: Explicitly authorize publication
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  actions: read
+jobs:
+  publish:
+    if: inputs.publish && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/mustache-core
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify successful CI and source identity
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          VALIDATION_RUN_ID: ${{ inputs.validation_run_id }}
+          CONFIRM_VERSION: ${{ inputs.confirm_version }}
+        run: python scripts/validate_promotion.py
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-mustache
+          run-id: ${{ inputs.validation_run_id }}
+          github-token: ${{ github.token }}
+          path: validated
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: qualification-summary-*-py3.11
+          run-id: ${{ inputs.validation_run_id }}
+          github-token: ${{ github.token }}
+          path: validation-evidence
+      - name: Select tested artifacts
+        run: python scripts/collect_release_artifacts.py validated dist --qualification validation-evidence
+      - name: Check distributions
+        run: |
+          python -m pip install twine
+          python -m twine check dist/*
+          python scripts/check_artifacts.py dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
