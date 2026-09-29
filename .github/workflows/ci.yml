@@ -6,12 +6,12 @@ on:
     inputs:
       core_sg_ref:
         description: Companion CORE-SG ref; use an immutable commit SHA for final qualification
-        default: 83e918c6e16fd4b5924eedff80435cd0a0962c97
+        default: e743dedf78734866d57c55e18586beb21e3da535
         required: true
 permissions:
   contents: read
 env:
-  CORE_SG_RC_SHA: 83e918c6e16fd4b5924eedff80435cd0a0962c97
+  CORE_SG_RC_SHA: e743dedf78734866d57c55e18586beb21e3da535
 jobs:
   build:
     name: Build common MustaCHE artifacts
