@@ -3,6 +3,13 @@
 Paired with `core-sg-mustache==0.4.5rc3`. CHANGELOG.md lists the previously
 audited corrections consolidated here. This stage adds no scientific algorithm.
 
+This RC restores the original tool's essential manual meta-dendrogram branch
+selection: visible internal-node targets can be physically clicked, selected
+groups and representatives update immediately, exports follow the active
+selection, and reopening a saved project restores it. Real-browser pointer
+tests now gate wheel and sdist qualification; synthetic Plotly events alone are
+not accepted as interaction evidence.
+
 ## Official RC platform policy
 
 Windows x86-64 and Linux x86-64 (glibc >= 2.28), **CPython 3.11 only**.

@@ -2,6 +2,11 @@
 
 ## 0.3.0rc3 — Unreleased
 
+- Restore manual selection of meta-hierarchy branches with real clickable
+  internal-node targets, immediate visual feedback, analysis/export integration
+  and selection persistence after project reopen. Cover physical clicks with a
+  browser E2E regression, including wheel and sdist qualification.
+
 - Narrow official RC scope to Windows/Linux x86-64 and CPython 3.11;
   require fresh wheel/sdist qualification on both platforms before promotion.
   macOS is unqualified future work, outside publication gates.

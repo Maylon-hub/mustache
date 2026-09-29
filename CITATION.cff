@@ -1,10 +1,10 @@
 cff-version: 1.2.0
-message: "Cite this modern software release AND the original papers. Proposed attribution: see AUTHORS.md and AUTHORSHIP_APPROVAL_REQUIRED.md."
+message: "Cite this modern software release and the original MustaCHE and CORE-SG papers. See AUTHORS.md for historical attribution and supervision."
 type: software
 authors:
   - family-names: "de Melo"
     given-names: "Maylon Martins"
-  - name: "MustaCHE contributors"
+    affiliation: "Departamento de Computação, Universidade Federal de São Carlos (UFSCar)"
 title: "MustaCHE: CORE-SG-centered modern explorer"
 version: 0.3.0rc3
 repository-code: "https://github.com/Maylon-hub/mustache"

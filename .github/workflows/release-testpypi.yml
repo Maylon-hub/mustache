@@ -17,7 +17,7 @@ permissions:
   actions: read
 jobs:
   publish:
-    if: inputs.publish
+    if: inputs.publish && github.ref_type == 'tag'
     runs-on: ubuntu-latest
     environment:
       name: testpypi
