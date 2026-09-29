@@ -203,6 +203,9 @@ body {
 
 .dendrogram-scroll { overflow-x: auto; }
 #meta-dendrogram .scatterlayer .trace:last-child .points path { cursor: pointer; }
+#meta-dendrogram.over-branch-target,
+#meta-dendrogram.over-branch-target .draglayer,
+#meta-dendrogram.over-branch-target .draglayer * { cursor: pointer !important; }
 
 /* Reachability multiple plot styling */
 .reachability-plot-wrapper {

@@ -151,12 +151,23 @@ def run(base: str, output: Path, project_root: Path | None = None, restart_serve
         page.mouse.move(hover_box["x"] + hover_box["width"] / 2,
                         hover_box["y"] + hover_box["height"] / 2)
         try:
-            page.wait_for_function("document.querySelector('#meta-dendrogram .draglayer .nsewdrag')?.style.cursor === 'pointer'",
-                                   timeout=3000)
+            page.wait_for_function("({x, y}) => { const target = document.elementFromPoint(x, y); return target && getComputedStyle(target).cursor === 'pointer'; }",
+                                   arg={"x": hover_box["x"] + hover_box["width"] / 2,
+                                        "y": hover_box["y"] + hover_box["height"] / 2}, timeout=3000)
             pointer_cursor = True
         except PlaywrightTimeoutError:
             pointer_cursor = False
             page.screenshot(path=str(output / "pointer-cursor-failure.png"), full_page=True)
+            diagnostic = page.evaluate("""({x, y}) => {
+                const target = document.elementFromPoint(x, y);
+                const plot = document.getElementById('meta-dendrogram');
+                return {target: target?.tagName, targetClass: target?.getAttribute('class'),
+                    actualCursor: target ? getComputedStyle(target).cursor : null,
+                    plotClass: plot?.className,
+                    overlayCursor: getComputedStyle(plot.querySelector('.draglayer .nsewdrag')).cursor};
+            }""", {"x": hover_box["x"] + hover_box["width"] / 2,
+                     "y": hover_box["y"] + hover_box["height"] / 2})
+            print("Pointer diagnostic:", json.dumps(diagnostic), flush=True)
         hover_help = "Select hierarchy group" in page.locator("#meta-dendrogram .hoverlayer").text_content()
         install_event_observer(page)
         page.screenshot(path=str(output / "before-manual-click.png"), full_page=True)
