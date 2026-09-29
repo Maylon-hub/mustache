@@ -332,8 +332,12 @@ def main() -> None:
 
             def start_server():
                 nonlocal server
+                # Keep the child process's working directory outside the
+                # TemporaryDirectory holding saved projects. Windows can keep
+                # a process CWD locked briefly even after termination, causing
+                # cleanup to fail after every browser assertion has passed.
                 server = subprocess.Popen([sys.executable, "-m", "mustache.cli", "--host", "127.0.0.1",
-                                           "--port", str(port)], cwd=isolated, env=env,
+                                           "--port", str(port)], cwd=output, env=env,
                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 wait_for_server(base)
 
