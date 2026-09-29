@@ -168,3 +168,26 @@ class TestAnalyzeBatchResults:
         for trace in branch_traces:
             assert set(trace['meta']['mpts_values']).issubset(valid_mpts)
         assert analysis['hai_computation']['method'] in {'exact-condensed', 'sampled-pairs'}
+
+    def test_internal_node_targets_match_linkage_descendants(self, blobs_100):
+        import json
+        X, _ = blobs_100
+        analysis = analyze_batch_results(self._run_batch(X))
+        figure = json.loads(analysis['meta_dendrogram_json'])
+        ordered = analysis['ordered_mpts']
+        n_leaves = len(ordered)
+        targets = [trace for trace in figure['data'] if trace.get('meta', {}).get('role') == 'branch-targets']
+        assert len(targets) == 1
+        target = targets[0]
+        assert figure['layout']['hovermode'] == 'closest'
+        assert target['mode'] == 'markers'
+        assert target['marker']['color'] != 'rgba(0,0,0,0)'
+        assert len(target['x']) == len(target['y']) == len(target['customdata']) == n_leaves - 1
+        assert set(target['customdata']) == set(range(n_leaves, 2 * n_leaves - 1))
+
+        members = {index: [ordered[index]] for index in range(n_leaves)}
+        for index, row in enumerate(analysis['meta_linkage']):
+            members[n_leaves + index] = sorted(members[int(row[0])] + members[int(row[1])])
+        for node_id in target['customdata']:
+            assert target['meta']['branch_members'][str(node_id)] == members[node_id]
+        assert all(trace['mode'] == 'lines' for trace in figure['data'][:-1])

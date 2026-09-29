@@ -99,6 +99,9 @@ def main():
                     tests = output / (kind + "-tests")
                     shutil.copytree(source / "tests", tests)
                     run(kind + "-full-suite", [python, "-m", "pytest", tests, "-q", "-p", "no:flask", "-o", "python_files=test_*.py", "--junitxml", output / (kind + "-tests.xml")])
+                    run(kind + "-browser-tools", [python, "-m", "pip", "install", "playwright==1.63.0"])
+                    run(kind + "-manual-browser", [python, source / "scripts/verify_manual_dendrogram.py",
+                                                  output / (kind + "-manual-browser")])
             run(kind + "-freeze", [python, "-m", "pip", "freeze", "--all"])
         evidence["metadata"] = tomllib.loads((source / "pyproject.toml").read_text())["project"]
         evidence["status"] = "PASS"

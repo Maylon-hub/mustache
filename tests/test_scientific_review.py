@@ -152,7 +152,9 @@ def test_missing_linkage_cannot_shift_mpts_matrix_order():
 def test_root_branch_contains_all_hierarchies():
     analysis = analyze_batch_results({'2': {'linkage_z': Z1.tolist()}, '4': {'linkage_z': Z2.tolist()}, '6': {'linkage_z': Z1.tolist()}})
     figure = json.loads(analysis['meta_dendrogram_json'])
-    root = max(figure['data'], key=lambda trace: len(trace['meta']['mpts_values']))
+    # The final Plotly trace is an interaction layer, not a hierarchy branch.
+    branches = [trace for trace in figure['data'] if trace.get('meta', {}).get('mpts_values')]
+    root = max(branches, key=lambda trace: len(trace['meta']['mpts_values']))
     assert root['meta']['mpts_values'] == [2, 4, 6]
     for group, mpts in analysis['medoids'].items():
         index = analysis['ordered_mpts'].index(mpts)

@@ -89,6 +89,7 @@ jobs:
           path: |
             ${{ runner.temp }}/mustache-qualification/*.log
             ${{ runner.temp }}/mustache-qualification/*.xml
+            ${{ runner.temp }}/mustache-qualification/*-manual-browser/**
           if-no-files-found: warn
       - name: Upload machine-readable qualification
         if: always()
