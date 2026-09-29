@@ -200,16 +200,28 @@ document.addEventListener('DOMContentLoaded', () => {
         Plotly.purge(div); div.innerHTML = '';
         await Plotly.newPlot(div, figure.data, figure.layout, { responsive: true, displayModeBar: false, edits: { shapePosition: true } });
         refreshSelection();
-        // Plotly's drag overlay is above the SVG markers, so the cursor must
-        // change on that overlay when hit testing reports an interactive node.
-        div.on('plotly_hover', event => {
+        // The drag overlay sits above Plotly's SVG. Browser/Plotly versions can
+        // differ in hover-event timing, so derive the cursor from the visible
+        // marker bounds rather than requiring a plotly_hover event.
+        if (div._branchCursorHandler) div.removeEventListener('mousemove', div._branchCursorHandler);
+        div._branchCursorHandler = event => {
             const overlay = div.querySelector('.draglayer .nsewdrag');
-            if (overlay) overlay.style.cursor = event.points?.[0]?.data?.meta?.role === 'branch-targets' ? 'pointer' : '';
-        });
-        div.on('plotly_unhover', () => {
+            if (!overlay) return;
+            const markers = div.querySelectorAll('.scatterlayer .trace:last-child .points path');
+            const onTarget = tool === 'select' && Array.from(markers).some(marker => {
+                const box = marker.getBoundingClientRect();
+                return event.clientX >= box.left && event.clientX <= box.right &&
+                    event.clientY >= box.top && event.clientY <= box.bottom;
+            });
+            overlay.style.cursor = onTarget ? 'pointer' : '';
+        };
+        div.addEventListener('mousemove', div._branchCursorHandler);
+        if (div._branchCursorLeaveHandler) div.removeEventListener('mouseleave', div._branchCursorLeaveHandler);
+        div._branchCursorLeaveHandler = () => {
             const overlay = div.querySelector('.draglayer .nsewdrag');
             if (overlay) overlay.style.cursor = '';
-        });
+        };
+        div.addEventListener('mouseleave', div._branchCursorLeaveHandler);
         div.on('plotly_click', event => {
             if (tool !== 'select') return;
             const point = event.points?.[0];

@@ -23,6 +23,7 @@ import time
 from zipfile import ZipFile
 
 from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 
 def free_port() -> int:
@@ -149,11 +150,14 @@ def run(base: str, output: Path, project_root: Path | None = None, restart_serve
         hover_box = marker(page, 0).bounding_box()
         page.mouse.move(hover_box["x"] + hover_box["width"] / 2,
                         hover_box["y"] + hover_box["height"] / 2)
-        page.wait_for_function("document.querySelector('#meta-dendrogram .draglayer .nsewdrag')?.style.cursor === 'pointer'")
-        check("interactive marker has pointer cursor", page.locator(
-              "#meta-dendrogram .draglayer .nsewdrag").evaluate("element => getComputedStyle(element).cursor") == "pointer")
-        check("marker hover explains branch", "Select hierarchy group" in
-              page.locator("#meta-dendrogram .hoverlayer").text_content())
+        try:
+            page.wait_for_function("document.querySelector('#meta-dendrogram .draglayer .nsewdrag')?.style.cursor === 'pointer'",
+                                   timeout=3000)
+            pointer_cursor = True
+        except PlaywrightTimeoutError:
+            pointer_cursor = False
+            page.screenshot(path=str(output / "pointer-cursor-failure.png"), full_page=True)
+        hover_help = "Select hierarchy group" in page.locator("#meta-dendrogram .hoverlayer").text_content()
         install_event_observer(page)
         page.screenshot(path=str(output / "before-manual-click.png"), full_page=True)
 
@@ -162,6 +166,8 @@ def run(base: str, output: Path, project_root: Path | None = None, restart_serve
         initial_fill = marker(page, small_index).evaluate("element => getComputedStyle(element).fill")
         selected = physical_click(page, small_index)
         check("real click updates backend group", selected["manual_groups"] == [small_group])
+        check("interactive marker has pointer cursor", pointer_cursor)
+        check("marker hover explains branch", hover_help)
         check("medoid minimizes within-group 1 - HAI", list(selected["medoids"].values()) ==
               [medoid(small_group, ordered, data["analysis"]["hai_matrix"])])
         check("visible branch count", page.locator("#selected-branches-badge").is_visible()
