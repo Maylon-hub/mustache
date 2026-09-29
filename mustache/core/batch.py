@@ -152,38 +152,54 @@ def analyze_batch_results(batch_results):
                 xs_pair = tuple(sorted((positions[left], positions[right])))
                 members[n_leaves + i] = members[left] + members[right]
                 positions[n_leaves + i] = sum(xs_pair) / 2
-                branch_members[(xs_pair[0], xs_pair[1], float(row[2]))] = members[n_leaves + i]
+                branch_members[(xs_pair[0], xs_pair[1], float(row[2]))] = (
+                    n_leaves + i, sorted(members[n_leaves + i])
+                )
 
-            # Build one Scatter trace per branch (each row of icoord/dcoord is one U-shape)
+            # Lines show the hierarchy; a separate visible marker trace is the
+            # interaction target for each internal node (a descendant group).
+            # Linkage node IDs are stable for this saved meta-linkage, unlike
+            # Plotly curve/point positions or overlapping line endpoints.
             traces = []
-            for branch_index, (xs, ys) in enumerate(zip(icoord.tolist(), dcoord.tolist())):
-                branch_mpts = sorted(branch_members[(min(xs), max(xs), max(ys))])
-                # Insert a point at the centre of the horizontal segment. Plotly
-                # click events are point-based, so this makes the visible branch
-                # reliably clickable without changing its geometry.
-                clickable_xs = [xs[0], xs[1], (xs[1] + xs[2]) / 2, xs[2], xs[3]]
-                clickable_ys = [ys[0], ys[1], ys[1], ys[2], ys[3]]
+            marker_x, marker_y, marker_ids = [], [], []
+            marker_groups = {}
+            for xs, ys in zip(icoord.tolist(), dcoord.tolist()):
+                node_id, branch_mpts = branch_members[(min(xs), max(xs), max(ys))]
+                marker_x.append((xs[1] + xs[2]) / 2)
+                marker_y.append(ys[1])
+                marker_ids.append(node_id)
+                marker_groups[str(node_id)] = branch_mpts
                 traces.append(go.Scatter(
-                    x=clickable_xs, y=clickable_ys, mode='lines+markers',
-                    line=dict(color='#2196F3', width=5),
-                    marker=dict(size=18, opacity=0),
-                    hovertemplate=(
-                        'Branch: mpts ' + ', '.join(map(str, branch_mpts)) +
-                        '<br>Merge distance: %{y:.6f}<extra></extra>'
-                    ),
+                    x=xs, y=ys, mode='lines',
+                    line=dict(color='#2196F3', width=3),
+                    hoverinfo='skip',
                     meta={
-                        'branch_id': branch_index,
+                        'branch_id': node_id,
                         'mpts_values': branch_mpts,
                         'merge_height': max(ys),
                     },
                     showlegend=False
                 ))
+            marker_size = 14 if n_leaves <= 20 else (11 if n_leaves <= 60 else 8)
+            traces.append(go.Scatter(
+                x=marker_x, y=marker_y, mode='markers',
+                customdata=marker_ids,
+                text=[f"Select hierarchy group: mpts {', '.join(map(str, marker_groups[str(node_id)]))}"
+                      for node_id in marker_ids],
+                marker=dict(size=marker_size, color='#FFFFFF',
+                            line=dict(color='#1D6F9E', width=2)),
+                hovertemplate='%{text}<br>Merge distance: %{y:.6f}<extra></extra>',
+                meta={'role': 'branch-targets', 'branch_members': marker_groups,
+                      'default_size': marker_size},
+                showlegend=False
+            ))
         
             layout = go.Layout(
                 template='plotly_white', title='Meta-Hierarchy Dendrogram',
                 xaxis=dict(tickvals=tick_vals, ticktext=leaf_labels, title='mpts Parameter', showgrid=False, zeroline=False),
                 yaxis=dict(title='Distance (1 - HAI)', showgrid=True, zeroline=True, rangemode='tozero'),
-                margin=dict(l=50, r=20, t=50, b=60), hovermode=False
+                margin=dict(l=50, r=20, t=50, b=60), hovermode='closest',
+                hoverdistance=12
             )
         
             fig_meta_dendro = go.Figure(data=traces, layout=layout)

@@ -42,6 +42,9 @@
                 </div>
                 <span id="selected-branches-badge" class="badge badge-info my-1 ml-1" style="display:none;">0 branches
                     selected</span>
+                <span id="manual-selection-help" class="small text-muted my-1 ml-1" style="display:none;">
+                    Click a circle at an internal node to select its descendant hierarchies.
+                </span>
                 <button id="btn-clear-selection" type="button" class="btn btn-sm btn-link text-muted"
                     style="display:none;" onclick="clearSelectedBranches()" title="Clear manually selected branches">
                     Clear selection
@@ -60,7 +63,7 @@
                         class="fas fa-layer-group"></i> Run Batch</button>
             </div>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body p-0 dendrogram-scroll">
             <div id="meta-dendrogram" style="height: 400px; width: 100%;"></div>
         </div>
     </div>

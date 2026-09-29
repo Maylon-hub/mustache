@@ -70,20 +70,30 @@ document.addEventListener('DOMContentLoaded', () => {
     function refreshSelection() {
         const badge = document.getElementById('selected-branches-badge');
         const clear = document.getElementById('btn-clear-selection');
+        const help = document.getElementById('manual-selection-help');
+        if (help) help.style.display = modeSelect.value === 'manual' && !manualGroups.length ? 'inline-block' : 'none';
         if (badge) {
-            badge.style.display = selected.size ? 'inline-block' : 'none';
-            badge.textContent = `${selected.size} hierarchies selected: mpts ${window.getSelectedMpts().join(', ')}`;
+            badge.style.display = manualGroups.length && modeSelect.value === 'manual' ? 'inline-block' : 'none';
+            badge.textContent = `${manualGroups.length} ${manualGroups.length === 1 ? 'branch' : 'branches'} selected · ${selected.size} hierarchies: mpts ${window.getSelectedMpts().join(', ')}`;
             badge.title = 'Selected branches define non-overlapping manual meta-clusters; their medoids are shown below. Selected hierarchies are also saved/exported.';
         }
-        if (clear) clear.style.display = selected.size ? 'inline-block' : 'none';
+        if (clear) clear.style.display = manualGroups.length && modeSelect.value === 'manual' ? 'inline-block' : 'none';
         const div = document.getElementById('meta-dendrogram');
         div?.data?.forEach((trace, i) => {
+            if (trace.meta?.role === 'branch-targets') {
+                const groups = trace.meta.branch_members || {};
+                const colors = trace.customdata.map(id => manualGroups.some(group => sameGroup(group, groups[id] || [])) ? '#1F6F5F' : '#FFFFFF');
+                const sizes = trace.customdata.map((id, index) => colors[index] === '#1F6F5F' ? trace.meta.default_size + 4 : trace.meta.default_size);
+                Plotly.restyle(div, { 'marker.color': [colors], 'marker.size': [sizes] }, [i]);
+                return;
+            }
             const values = trace.meta?.mpts_values || [];
             if (!values.length) return;
-            const active = values.every(value => selected.has(Number(value)));
-            Plotly.restyle(div, { 'line.color': active ? '#1F6F5F' : '#2196F3', 'line.width': active ? 6 : 3, opacity: 1 }, [i]);
+            const active = modeSelect.value === 'manual' && manualGroups.some(group => values.every(value => group.includes(Number(value))));
+            Plotly.restyle(div, { 'line.color': active ? '#1F6F5F' : '#2196F3', 'line.width': active ? 5 : 3 }, [i]);
         });
     }
+    const sameGroup = (left, right) => left.length === right.length && left.every(value => right.includes(value));
     window.clearSelectedBranches = () => {
         selected.clear(); manualGroups = []; refreshSelection();
         if (analysis && modeSelect.value === 'manual') enqueuePartition(null).catch(error => alert(error.message));
@@ -133,6 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function changeMode() {
         if (!analysis) return;
         clearTimeout(timer);
+        selected = new Set(modeSelect.value === 'manual' ? manualGroups.flat() : []);
+        refreshSelection();
         const div = document.getElementById('meta-dendrogram');
         const max = Math.max(0, ...div.data.flatMap(trace => trace.y || []));
         try {
@@ -145,6 +157,33 @@ document.addEventListener('DOMContentLoaded', () => {
     async function renderDendrogram() {
         if (!analysis?.meta_dendrogram_json) return;
         const figure = JSON.parse(analysis.meta_dendrogram_json);
+        // Projects saved before visible targets used transparent markers inside
+        // line traces. Upgrade their figures only in memory; no recomputation.
+        if (!figure.data.some(trace => trace.meta?.role === 'branch-targets')) {
+            const branches = figure.data.filter(trace => trace.meta?.mpts_values?.length);
+            if (branches.length) {
+                const branchMembers = {}, markerIds = [], markerX = [], markerY = [], markerText = [];
+                branches.forEach((trace, index) => {
+                    const id = String(trace.meta.branch_id ?? index);
+                    branchMembers[id] = trace.meta.mpts_values.map(Number);
+                    markerIds.push(id);
+                    markerX.push(trace.x.length === 5 ? trace.x[2] : (trace.x[1] + trace.x[2]) / 2);
+                    markerY.push(trace.y[1]);
+                    markerText.push(`Select hierarchy group: mpts ${branchMembers[id].join(', ')}`);
+                    trace.mode = 'lines'; delete trace.marker;
+                    trace.hoverinfo = 'skip';
+                });
+                const size = branches.length <= 20 ? 14 : (branches.length <= 60 ? 11 : 8);
+                figure.data.push({ type: 'scatter', mode: 'markers', x: markerX, y: markerY,
+                    customdata: markerIds, text: markerText,
+                    marker: { size, color: '#FFFFFF', line: { color: '#1D6F9E', width: 2 } },
+                    hovertemplate: '%{text}<br>Merge distance: %{y:.6f}<extra></extra>',
+                    meta: { role: 'branch-targets', branch_members: branchMembers, default_size: size },
+                    showlegend: false });
+            }
+        }
+        figure.layout.hovermode = 'closest';
+        figure.layout.hoverdistance = 12;
         figure.layout.margin = { t: 50, r: 20, l: 60, b: 55 };
         figure.layout.font = { size: 12 };
         if (modeSelect) modeSelect.value = analysis.selection_mode || 'automatic';
@@ -154,15 +193,31 @@ document.addEventListener('DOMContentLoaded', () => {
             line: { color: '#9A681A', width: 2, dash: 'dot' }, editable: true
         }] : [];
         const div = document.getElementById('meta-dendrogram');
+        const hierarchyCount = analysis.ordered_mpts?.length || 0;
+        // Dense trees remain readable on narrow screens by scrolling rather
+        // than compressing touch targets into overlapping pixels.
+        div.style.minWidth = `${Math.max(320, hierarchyCount * (hierarchyCount > 20 ? 24 : 18) + 100)}px`;
         Plotly.purge(div); div.innerHTML = '';
         await Plotly.newPlot(div, figure.data, figure.layout, { responsive: true, displayModeBar: false, edits: { shapePosition: true } });
         refreshSelection();
+        // Plotly's drag overlay is above the SVG markers, so the cursor must
+        // change on that overlay when hit testing reports an interactive node.
+        div.on('plotly_hover', event => {
+            const overlay = div.querySelector('.draglayer .nsewdrag');
+            if (overlay) overlay.style.cursor = event.points?.[0]?.data?.meta?.role === 'branch-targets' ? 'pointer' : '';
+        });
+        div.on('plotly_unhover', () => {
+            const overlay = div.querySelector('.draglayer .nsewdrag');
+            if (overlay) overlay.style.cursor = '';
+        });
         div.on('plotly_click', event => {
             if (tool !== 'select') return;
-            const values = (event.points?.[0]?.data?.meta?.mpts_values || []).map(Number);
+            const point = event.points?.[0];
+            if (point?.data?.meta?.role !== 'branch-targets') return;
+            const nodeId = String(point.customdata ?? point.data.customdata?.[point.pointNumber]);
+            const values = (point.data.meta.branch_members?.[nodeId] || []).map(Number);
             if (!values.length) return;
-            const same = group => group.length === values.length && group.every(value => values.includes(value));
-            const remove = manualGroups.some(same);
+            const remove = manualGroups.some(group => sameGroup(group, values));
             // New ancestor/descendant replaces overlapping previous groups;
             // each hierarchy can belong to at most one manual meta-cluster.
             manualGroups = manualGroups.filter(group => !group.some(value => values.includes(value)));
@@ -287,7 +342,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ({ analysis, results, params, metadata } = event.detail);
         analysisGeneration++; cutSequence++; representativeSignature = '';
         selected = new Set((analysis.selected_mpts || []).map(Number));
-        manualGroups = analysis.manual_groups || [];
+        manualGroups = (analysis.manual_groups || []).map(group => group.map(Number));
+        if (analysis.selection_mode !== 'manual') selected.clear();
         await renderAnalysis();
     });
     window.confirmSaveProjectMain = async () => {
@@ -336,11 +392,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('inspect-hierarchy')?.addEventListener('click', () => inspectHierarchy(Number(document.getElementById('inspect-mpts').value)));
     window.exportSelectedBranchesCSV = async () => {
         if (!results) return alert('Run or load an analysis before exporting.');
+        if (modeSelect?.value === 'manual' && !manualGroups.length) return alert('Select at least one branch before exporting manual meta-clusters.');
         try {
             clearTimeout(timer);
             if (modeSelect?.value === 'threshold') await enqueuePartition(document.getElementById('meta-dendrogram').layout.shapes[0].y0);
             await pendingCut;
-            const response = await fetch('/export_branches_csv', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mpts_list: selected.size ? window.getSelectedMpts() : Object.values(analysis.medoids || {}) }) });
+            const mptsList = modeSelect?.value === 'manual' ? window.getSelectedMpts() : Object.values(analysis.medoids || {});
+            const response = await fetch('/export_branches_csv', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mpts_list: mptsList }) });
             if (!response.ok) throw new Error((await response.json()).error);
             const url = URL.createObjectURL(await response.blob()), link = document.createElement('a');
             link.href = url; link.download = 'mustache_clusters.csv'; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);

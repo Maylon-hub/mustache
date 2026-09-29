@@ -201,6 +201,9 @@ body {
     padding: 10px 15px;
 }
 
+.dendrogram-scroll { overflow-x: auto; }
+#meta-dendrogram .scatterlayer .trace:last-child .points path { cursor: pointer; }
+
 /* Reachability multiple plot styling */
 .reachability-plot-wrapper {
     flex: 0 0 360px;
