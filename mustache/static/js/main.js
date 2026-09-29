@@ -104,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.entries(ids).forEach(([name, id]) => document.getElementById(id)?.classList.toggle('active', name === value));
         const div = document.getElementById('meta-dendrogram');
         if (!div?.data) return;
+        if (value !== 'select') div.classList.remove('over-branch-target');
         if (value === 'cut' && modeSelect?.value !== 'threshold') {
             modeSelect.value = 'threshold';
             await changeMode();
@@ -213,13 +214,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 return event.clientX >= box.left && event.clientX <= box.right &&
                     event.clientY >= box.top && event.clientY <= box.bottom;
             });
-            overlay.style.cursor = onTarget ? 'pointer' : '';
+            div.classList.toggle('over-branch-target', onTarget);
         };
         div.addEventListener('mousemove', div._branchCursorHandler);
         if (div._branchCursorLeaveHandler) div.removeEventListener('mouseleave', div._branchCursorLeaveHandler);
         div._branchCursorLeaveHandler = () => {
-            const overlay = div.querySelector('.draglayer .nsewdrag');
-            if (overlay) overlay.style.cursor = '';
+            div.classList.remove('over-branch-target');
         };
         div.addEventListener('mouseleave', div._branchCursorLeaveHandler);
         div.on('plotly_click', event => {
