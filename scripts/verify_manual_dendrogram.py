@@ -58,6 +58,16 @@ def marker(page, index: int):
     return page.locator("#meta-dendrogram .scatterlayer .trace:last-child .points path").nth(index)
 
 
+def wait_for_dendrogram_ready(page) -> None:
+    # Visible SVG markers can precede Plotly.newPlot's completion and the
+    # cursor handler registration. Synchronize with the actual interactive UI.
+    page.wait_for_function("""() => {
+        const plot = document.getElementById('meta-dendrogram');
+        return typeof plot?._branchCursorHandler === 'function' &&
+            plot.data?.at(-1)?.meta?.role === 'branch-targets';
+    }""", timeout=15000)
+
+
 def marker_has_cursor(page, index: int, expected: str) -> bool:
     box = marker(page, index).bounding_box()
     assert box, "Marker is not visible"
@@ -105,10 +115,20 @@ def install_event_observer(page) -> None:
 
 
 def select_mode(page, value: str) -> None:
+    page.evaluate("""() => {
+        window.previousBranchCursorHandler =
+            document.getElementById('meta-dendrogram')._branchCursorHandler;
+    }""")
     with page.expect_response(lambda response: response.url.endswith("/cut_dendrogram"), timeout=15000) as observed:
         page.locator("#meta-selection-mode").select_option(value)
     assert observed.value.ok, observed.value.text()
     page.wait_for_load_state("networkidle")
+    page.wait_for_function("""() => {
+        const plot = document.getElementById('meta-dendrogram');
+        return typeof plot?._branchCursorHandler === 'function' &&
+            plot._branchCursorHandler !== window.previousBranchCursorHandler;
+    }""", timeout=15000)
+    wait_for_dendrogram_ready(page)
 
 
 def batch(page, base: str, minimum: int, maximum: int, step: int = 2) -> dict:
@@ -123,6 +143,8 @@ def batch(page, base: str, minimum: int, maximum: int, step: int = 2) -> dict:
     response = observed.value
     assert response.ok, response.text()
     page.locator("#meta-dendrogram .scatterlayer .trace:last-child .points path").first.wait_for()
+    wait_for_dendrogram_ready(page)
+    page.locator(".modal-backdrop").wait_for(state="detached")
     return response.json()
 
 
@@ -238,6 +260,7 @@ def run(base: str, output: Path, project_root: Path | None = None, restart_serve
             check("server restarted before project reopen", True)
         page.goto(base + "/?project_id=" + project_id)
         page.locator("#meta-dendrogram .scatterlayer .trace:last-child .points path").first.wait_for()
+        wait_for_dendrogram_ready(page)
         check("manual mode restored", page.locator("#meta-selection-mode").input_value() == "manual")
         check("pointer cursor survives saved-project re-render", marker_has_cursor(page, 0, "pointer"))
         check("selected branch restored visually", "1 branch selected" in page.locator("#selected-branches-badge").inner_text())
@@ -281,6 +304,7 @@ def run(base: str, output: Path, project_root: Path | None = None, restart_serve
             path.write_text(json.dumps(old_project), encoding="utf-8")
             page.goto(base + "/?project_id=" + project_id)
             page.locator("#meta-dendrogram .scatterlayer .trace:last-child .points path").first.wait_for()
+            wait_for_dendrogram_ready(page)
             check("old saved figure upgraded on reopen", marker_data(page)["role"] == "branch-targets")
             old_targets = marker_data(page)
             old_root = max(range(len(old_targets["ids"])),
