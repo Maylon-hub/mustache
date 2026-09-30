@@ -203,8 +203,9 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshSelection();
         // The drag overlay sits above Plotly's SVG. Browser/Plotly versions can
         // differ in hover-event timing, so derive the cursor from the visible
-        // marker bounds rather than requiring a plotly_hover event.
-        if (div._branchCursorHandler) div.removeEventListener('mousemove', div._branchCursorHandler);
+        // marker bounds rather than requiring a plotly_hover event. Capture
+        // mousemove before the drag overlay can consume its bubbling phase.
+        if (div._branchCursorHandler) div.removeEventListener('mousemove', div._branchCursorHandler, true);
         div._branchCursorHandler = event => {
             const overlay = div.querySelector('.draglayer .nsewdrag');
             if (!overlay) return;
@@ -216,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             div.classList.toggle('over-branch-target', onTarget);
         };
-        div.addEventListener('mousemove', div._branchCursorHandler);
+        div.addEventListener('mousemove', div._branchCursorHandler, true);
         if (div._branchCursorLeaveHandler) div.removeEventListener('mouseleave', div._branchCursorLeaveHandler);
         div._branchCursorLeaveHandler = () => {
             div.classList.remove('over-branch-target');

@@ -58,6 +58,19 @@ def marker(page, index: int):
     return page.locator("#meta-dendrogram .scatterlayer .trace:last-child .points path").nth(index)
 
 
+def marker_has_cursor(page, index: int, expected: str) -> bool:
+    box = marker(page, index).bounding_box()
+    assert box, "Marker is not visible"
+    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    page.mouse.move(1, 1)
+    page.mouse.move(x, y)
+    page.wait_for_function("""({x, y, expected}) => {
+        const cursor = getComputedStyle(document.elementFromPoint(x, y)).cursor;
+        return expected === 'pointer' ? cursor === 'pointer' : cursor !== 'pointer';
+    }""", arg={"x": x, "y": y, "expected": expected}, timeout=3000)
+    return True
+
+
 def physical_click(page, index: int) -> dict:
     # Attach a passive observer to the current Plotly instance. Mode changes
     # can purge/recreate it, so an observer attached earlier may be stale.
@@ -174,8 +187,16 @@ def run(base: str, output: Path, project_root: Path | None = None, restart_serve
 
         small_index = min(range(len(targets["ids"])), key=lambda i: len(targets["groups"][str(targets["ids"][i])]))
         small_group = targets["groups"][str(targets["ids"][small_index])]
+        for index in sorted({0, small_index, len(targets["ids"]) - 1}):
+            check(f"internal marker {index} has pointer cursor", marker_has_cursor(page, index, "pointer"))
+        check("selected marker has pointer cursor after traversing targets",
+              marker_has_cursor(page, small_index, "pointer"))
         initial_fill = marker(page, small_index).evaluate("element => getComputedStyle(element).fill")
         selected = physical_click(page, small_index)
+        if selected["manual_groups"] != [small_group]:
+            print("Marker click diagnostic:", json.dumps({"expected": small_group,
+                  "actual": selected["manual_groups"], "clicks": page.evaluate("window.realPlotlyClicks"),
+                  "targets": marker_data(page)}), flush=True)
         check("real click updates backend group", selected["manual_groups"] == [small_group])
         check("interactive marker has pointer cursor", pointer_cursor)
         check("marker hover explains branch", hover_help)
@@ -218,6 +239,7 @@ def run(base: str, output: Path, project_root: Path | None = None, restart_serve
         page.goto(base + "/?project_id=" + project_id)
         page.locator("#meta-dendrogram .scatterlayer .trace:last-child .points path").first.wait_for()
         check("manual mode restored", page.locator("#meta-selection-mode").input_value() == "manual")
+        check("pointer cursor survives saved-project re-render", marker_has_cursor(page, 0, "pointer"))
         check("selected branch restored visually", "1 branch selected" in page.locator("#selected-branches-badge").inner_text())
         check("representative restored", f"mpts = {list(child['medoids'].values())[0]}" in
               page.locator("#reachability-container").inner_text())
@@ -263,12 +285,26 @@ def run(base: str, output: Path, project_root: Path | None = None, restart_serve
             old_targets = marker_data(page)
             old_root = max(range(len(old_targets["ids"])),
                            key=lambda i: len(old_targets["groups"][str(old_targets["ids"][i])]))
+            check("upgraded figure marker has pointer cursor", marker_has_cursor(page, old_root, "pointer"))
             check("upgraded old project receives a real click", physical_click(page, old_root)["manual_groups"] == [ordered])
+
+        page.mouse.move(1, 1)
+        check("pointer cursor clears when leaving marker", not page.locator("#meta-dendrogram").evaluate(
+            "element => element.classList.contains('over-branch-target')"))
+        page.locator("#btn-tool-pan").click()
+        check("pan tool does not show select cursor", marker_has_cursor(page, 0, "not-pointer"))
+        with page.expect_response(lambda response: response.url.endswith("/cut_dendrogram")):
+            page.locator("#btn-tool-cut").click()
+        check("cut tool does not show select cursor", marker_has_cursor(page, 0, "not-pointer"))
+        page.locator("#btn-tool-wand").click()
+        select_mode(page, "manual")
+        check("select cursor returns after tool change and re-render", marker_has_cursor(page, 0, "pointer"))
 
         medium = batch(page, base, 2, 20)
         medium_targets = marker_data(page)
         check("medium dendrogram targets", len(medium_targets["ids"]) == len(medium["analysis"]["ordered_mpts"]) - 1)
         select_mode(page, "manual")
+        check("pointer cursor survives medium dendrogram re-render", marker_has_cursor(page, 0, "pointer"))
         install_event_observer(page)
         independent = next(((i, j) for i, left in enumerate(medium_targets["ids"])
                             for j, right in enumerate(medium_targets["ids"]) if j > i and
@@ -277,6 +313,8 @@ def run(base: str, output: Path, project_root: Path | None = None, restart_serve
         first, second = independent
         first_group = medium_targets["groups"][str(medium_targets["ids"][first])]
         second_group = medium_targets["groups"][str(medium_targets["ids"][second])]
+        check("second medium branch has pointer cursor", marker_has_cursor(page, second, "pointer"))
+        check("first medium branch regains pointer cursor", marker_has_cursor(page, first, "pointer"))
         physical_click(page, first)
         pair = physical_click(page, second)
         check("two independent branches coexist", pair["manual_groups"] == [first_group, second_group]
@@ -306,6 +344,7 @@ def run(base: str, output: Path, project_root: Path | None = None, restart_serve
         dot.scroll_into_view_if_needed()
         check("far marker reachable by horizontal scroll", page.evaluate(
               "document.querySelector('.dendrogram-scroll').scrollLeft > 0"))
+        check("mobile marker has pointer cursor", marker_has_cursor(page, rightmost, "pointer"))
         mobile_result = physical_click(page, rightmost)
         check("mobile real click works", mobile_result["manual_groups"] ==
               [mobile["groups"][str(mobile["ids"][rightmost])]])
