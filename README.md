@@ -22,24 +22,25 @@ requirements for CORE-SG behavior or substitutes for experiments against RNG.
 
 ## Current source and installation
 
-The unpublished release candidate is `mustache-core==0.3.0rc3`, paired with
-`core-sg-mustache==0.4.5rc3` and `hdbscan==0.8.44`. An old TestPyPI wheel does
-not contain these corrections. See [release notes](RELEASE_NOTES.md),
+The unpublished stable candidate is `mustache-core==0.3.0`, paired with
+`core-sg-mustache==0.4.5` and `hdbscan==0.8.44`. The qualified `0.3.0rc3` /
+`0.4.5rc3` pair remains available on TestPyPI as an immutable pre-release
+record. See [release notes](RELEASE_NOTES.md),
 [citation roles](AUTHORS.md), [dataset provenance](DATASETS.md), and the
-[artifact-only reproduction procedure](docs/rc_preparation.md).
+[historical RC reproduction procedure](docs/rc_preparation.md).
 
-This RC's official platform scope is **Windows x86-64 and Linux x86-64**, with
-**CPython 3.11 only**. Windows qualification has passed; Linux qualification must
-pass GitHub Actions before publication. Linux wheels target manylinux with
+This stable candidate targets **Windows x86-64 and Linux x86-64**, with
+**CPython 3.11 only**. Its new wheel/sdist artifacts require separate
+Windows/Linux qualification before publication. Linux wheels target manylinux with
 glibc >= 2.28. macOS is **not currently qualified / future work**, not known
-to be incompatible. Python 3.10, 3.12 and 3.13 are outside this RC's declared
+to be incompatible. Python 3.10, 3.12 and 3.13 are outside this release's declared
 support until independently qualified.
 
 Use CPython 3.11 and an isolated environment. For development of both checkouts:
 
 ```powershell
-git clone --branch mustache-core-sg https://github.com/Maylon-hub/mustache.git
-git clone --branch develop https://github.com/Maylon-hub/core-sg.git
+git clone --branch release/mustache-0.3.0 https://github.com/Maylon-hub/mustache.git
+git clone --branch release/core-sg-0.4.5 https://github.com/Maylon-hub/core-sg.git
 cd mustache
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip

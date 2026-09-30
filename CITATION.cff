@@ -6,7 +6,7 @@ authors:
     given-names: "Maylon Martins"
     affiliation: "Departamento de Computação, Universidade Federal de São Carlos (UFSCar)"
 title: "MustaCHE: CORE-SG-centered modern explorer"
-version: 0.3.0rc3
+version: 0.3.0
 repository-code: "https://github.com/Maylon-hub/mustache"
 url: "https://github.com/maylon-hub/mustache"
 license: BSD-3-Clause

@@ -100,28 +100,30 @@ node scripts/verify_web_ui.cjs http://127.0.0.1:5057 ./ui-baseline-review hdbsca
 ```
 
 The default check uses CORE-SG. It checks save/reopen/export, manual representatives, metadata, assets and
-basic mobile overflow, and records JSON plus screenshots. Branch interaction
-is tested through Plotly events; this is not a pixel-level mouse-hit test.
+basic mobile overflow, and records JSON plus screenshots. Its Plotly event
+checks are not physical hit-testing. Use `scripts/verify_manual_dendrogram.py`
+for the separate real-pointer Chrome regression.
 
 ## Candidate packages instead of source
 
-The current pair is `mustache-core==0.3.0rc3` and `core-sg-mustache==0.4.5rc3`.
-They are not published. Use locally built artifacts as described in
-[RC preparation](rc_preparation.md). Do not use an editable install or PYTHONPATH
-to qualify package installation. After a separately authorized TestPyPI upload,
-install stable dependencies first, then the two explicit candidates with
-`--no-deps`; do not request prereleases of every dependency.
+The unpublished stable-candidate pair is `mustache-core==0.3.0` and
+`core-sg-mustache==0.4.5`. Qualify their newly built artifacts using the
+artifact-only approach in [RC preparation](rc_preparation.md); that page is a
+historical RC procedure. Do not use an editable install or PYTHONPATH to
+qualify package installation. The previously qualified RCs remain on TestPyPI;
+to reproduce that historical pair, install normal dependencies from PyPI and
+the two explicit RC packages with `--no-deps`:
 
 ```powershell
 python -m pip install Flask numpy pandas scikit-learn scipy plotly hdbscan==0.8.44 pynndescent
-# Only AFTER the separately authorized upload:
+# Historical TestPyPI RCs, not the unpublished stable artifacts:
 python -m pip install --index-url https://test.pypi.org/simple/ --no-deps core-sg-mustache==0.4.5rc3 mustache-core==0.3.0rc3
 python -m pip check
 ```
 
 Verify wheel availability for the actual Python/platform combination. The
-commands are installation instructions, not evidence of availability checked
-during this review.
+stable pair must be installed from its own freshly built wheel/sdist until
+separately authorized for publication. These commands do not qualify it.
 
 ## Benchmarks and scientific acceptance
 

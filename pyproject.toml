@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mustache-core"
-version = "0.3.0rc3"
+version = "0.3.0"
 description = "MustaCHE (Multiple Cluster Hierarchies Explorer) integrated with pre-compiled Core-SG"
 authors = [
     {name = "Maylon Martins de Melo", email = "maylonmmartins@estudante.ufscar.br"},
@@ -26,7 +26,7 @@ dependencies = [
     "Flask>=3.0.0",
     # Private tree API: only this native hdbscan release is qualified for this RC.
     "hdbscan==0.8.44",
-    "core-sg-mustache==0.4.5rc3",
+    "core-sg-mustache==0.4.5",
     "numpy>=1.24,<3",
     "pandas>=2.0",
     "scikit-learn>=1.3",
@@ -41,7 +41,7 @@ mustache = "mustache.cli:main"
 Source = "https://github.com/Maylon-hub/mustache"
 Issues = "https://github.com/Maylon-hub/mustache/issues"
 Documentation = "https://maylon-hub.github.io/mustache/"
-Changelog = "https://github.com/Maylon-hub/mustache/blob/mustache-core-sg/CHANGELOG.md"
+Changelog = "https://github.com/Maylon-hub/mustache/blob/release/mustache-0.3.0/CHANGELOG.md"
 
 [tool.setuptools]
 include-package-data = true

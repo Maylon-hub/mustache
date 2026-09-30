@@ -42,7 +42,7 @@ def test_accept_auditwheel_manylinux_compatibility_aliases():
 @pytest.fixture
 def evidence(tmp_path):
     def create(name="core-sg-mustache"):
-        project = {"name": name, "version": "0.4.5rc3" if name.startswith("core") else "0.3.0rc3"}
+        project = {"name": name, "version": "0.4.5" if name.startswith("core") else "0.3.0"}
         src = tmp_path / "artifacts"
         src.mkdir()
         artifacts = []

@@ -6,12 +6,12 @@ on:
     inputs:
       core_sg_ref:
         description: Companion CORE-SG ref; use an immutable commit SHA for final qualification
-        default: e743dedf78734866d57c55e18586beb21e3da535
+        default: 7a8abb162c248f82d08247e2732fda3c7d8d690e
         required: true
 permissions:
   contents: read
 env:
-  CORE_SG_RC_SHA: e743dedf78734866d57c55e18586beb21e3da535
+  CORE_SG_COMPANION_SHA: 7a8abb162c248f82d08247e2732fda3c7d8d690e
 jobs:
   build:
     name: Build common MustaCHE artifacts
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Maylon-hub/core-sg
-          ref: ${{ inputs.core_sg_ref || env.CORE_SG_RC_SHA }}
+          ref: ${{ inputs.core_sg_ref || env.CORE_SG_COMPANION_SHA }}
           path: companion-core-sg
       - uses: actions/setup-python@v5
         with:
@@ -60,7 +60,7 @@ jobs:
           actual = subprocess.check_output(
               ['git', '-C', 'companion-core-sg', 'rev-parse', 'HEAD'], text=True
           ).strip()
-          expected = os.environ['CORE_SG_RC_SHA']
+          expected = os.environ['CORE_SG_COMPANION_SHA']
           if actual != expected:
               raise SystemExit(f'Unqualified CORE-SG companion: {actual}; expected {expected}')
       - uses: actions/download-artifact@v4
