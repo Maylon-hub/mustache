@@ -1,5 +1,9 @@
 # Technical and functional review — 2026-09-26
 
+> Historical review of the source at the stated date. Branch names, versions,
+> installation status and test counts below are historical observations, not
+> the current stable release status. See [Release history](release_history.md).
+
 This review prioritizes scientific consistency, historical functionality and
 reproducibility over speed. HAI remains the primary hierarchy agreement measure.
 No clustering validation score or tree edit distance replaces it.

@@ -22,39 +22,37 @@ requirements for CORE-SG behavior or substitutes for experiments against RNG.
 
 ## Current source and installation
 
-The unpublished stable candidate is `mustache-core==0.3.0`, paired with
-`core-sg-mustache==0.4.5` and `hdbscan==0.8.44`. The qualified `0.3.0rc3` /
-`0.4.5rc3` pair remains available on TestPyPI as an immutable pre-release
-record. See [release notes](RELEASE_NOTES.md),
+The stable `mustache-core==0.3.0` and `core-sg-mustache==0.4.5` packages are
+published on **TestPyPI**, not official PyPI. The qualified `0.3.0rc3` /
+`0.4.5rc3` pair remains there as a historical pre-release record. HDBSCAN
+`0.8.44` is an exact runtime dependency. See [release notes](RELEASE_NOTES.md),
 [citation roles](AUTHORS.md), [dataset provenance](DATASETS.md), and the
-[historical RC reproduction procedure](docs/rc_preparation.md).
+[installation guide](docs/installation.md).
 
-This stable candidate targets **Windows x86-64 and Linux x86-64**, with
-**CPython 3.11 only**. Its new wheel/sdist artifacts require separate
-Windows/Linux qualification before publication. Linux wheels target manylinux with
-glibc >= 2.28. macOS is **not currently qualified / future work**, not known
-to be incompatible. Python 3.10, 3.12 and 3.13 are outside this release's declared
-support until independently qualified.
+The stable releases are qualified on **Windows x86-64 and Linux x86-64**, with
+**CPython 3.11 only**. The CORE-SG Linux wheel targets manylinux with glibc
+>= 2.28. macOS is **not currently qualified / future work**, not known to be
+incompatible. Python 3.10, 3.12 and 3.13 are not qualified for this release.
 
-Use CPython 3.11 and an isolated environment. For development of both checkouts:
+For normal use on Windows, create a fresh environment and install from
+TestPyPI (PowerShell):
 
 ```powershell
-git clone --branch release/mustache-0.3.0 https://github.com/Maylon-hub/mustache.git
-git clone --branch release/core-sg-0.4.5 https://github.com/Maylon-hub/core-sg.git
-cd mustache
-python -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -e ../core-sg
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
-.\.venv\Scripts\python.exe -m mustache.cli --help
-.\.venv\Scripts\python.exe -m mustache.cli
+.\.venv\Scripts\python.exe -m pip install --extra-index-url https://test.pypi.org/simple/ mustache-core==0.3.0
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\mustache.exe
 ```
 
-Building CORE-SG from source requires a compatible C/C++ compiler. A compatible
-binary wheel avoids compilation. On Linux use `.venv/bin/python`.
-See [reproduction instructions](docs/reproducao.md) for import provenance and
-candidate-package installation. Wheel availability and test results on other
-platforms must be checked for the specific release.
+Package metadata installs HDBSCAN, CORE-SG and the other runtime dependencies;
+no separate manual installs are needed. `--extra-index-url` lets pip consider
+both official PyPI and TestPyPI for dependency resolution. For strict source
+isolation, use the [reproduction procedure](docs/reproducao.md), which obtains
+only the two named distributions from TestPyPI and their dependencies from
+official PyPI. On Linux, use `python3.11 -m venv .venv`, `.venv/bin/python`
+and `.venv/bin/mustache`. A compatible CORE-SG binary wheel avoids compiling
+its native extensions.
 
 Open `http://127.0.0.1:5000`. The `mustache` CLI launches the local Web UI;
 it has host, port and debug options, not batch-processing subcommands.

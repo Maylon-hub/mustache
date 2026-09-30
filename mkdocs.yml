@@ -4,7 +4,7 @@ site_author: Maylon Martins de Melo
 site_url: https://maylon-hub.github.io/mustache/
 repo_name: Maylon-hub/mustache
 repo_url: https://github.com/Maylon-hub/mustache
-edit_uri: edit/mustache-core-sg/docs/
+edit_uri: edit/master/docs/
 
 # Keep reports, bibliographies, PDFs and local build inputs in the repository
 # without exposing them as pages or downloads on the public documentation site.
@@ -55,11 +55,12 @@ theme:
 
 nav:
   - Home: index.md
+  - Installation / quick start: installation.md
   - User guide: guia_documentacao.md
   - Reproduction: reproducao.md
-  - Release candidate: rc_preparation.md
+  - Release history: release_history.md
   - Technical review: technical_review_2026-09-26.md
-  - Quickstart notebook: https://github.com/Maylon-hub/mustache/blob/mustache-core-sg/examples/mustache_quickstart.ipynb
+  - Quickstart notebook: https://github.com/Maylon-hub/mustache/blob/master/examples/mustache_quickstart.ipynb
   - Source code: https://github.com/Maylon-hub/mustache
 
 markdown_extensions:
