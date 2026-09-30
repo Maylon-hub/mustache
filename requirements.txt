@@ -1,11 +1,7 @@
-flask==3.0.0
-gunicorn==21.2.0
-numpy==1.26.2
-pandas==2.1.3
-scikit-learn==1.3.2
-scipy==1.11.4
-plotly==5.18.0
-python-dotenv==1.0.0
-setuptools
-wheel
-Cython
+# Development requirements linked to editable install
+-e .
+
+# Development & testing tools
+pytest>=8.0
+pytest-flask>=1.3
+python-dotenv>=1.0.0

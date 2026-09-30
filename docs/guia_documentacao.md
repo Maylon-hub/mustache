@@ -1,388 +1,183 @@
-# Guia de Documentação — MustaCHE v2
+# MustaCHE user and scientific guide
 
-**Pacote**: `mustache-core` v0.2.0  
-**Backend**: `core-sg-mustache` v0.3.0 (Cython nativo)  
-**Estilo deste guia**: [Read the Docs](https://www.sphinx-doc.org/) / [MkDocs](https://www.mkdocs.org/)
+MustaCHE compares density-based hierarchies generated for different `mpts`
+settings on the same indexed samples. It preserves the original exploration
+workflow through CORE-SG, the default and principal engine, and interactive
+Plotly views. A separate HDBSCAN engine is an auxiliary comparison baseline.
 
-> Este documento serve como referência para usuários finais, orientadores e colaboradores que desejam **instalar, usar a API, interpretar saídas e operar a Web UI** do MustaCHE.
+## HAI is the hierarchy comparison
 
----
+For a hierarchy H, let d_H(i,j) be the size of the lowest cluster containing
+both indexed samples, divided by n. HAI is
 
-## Sumário
+`HAI(H1,H2) = 1 - (2/n²) Σ(i<j) |d_H1(i,j) - d_H2(i,j)|.`
 
-1. [Visão Geral](#1-visão-geral)
-2. [Instalação](#2-instalação)
-3. [API Reference — `run_clustering`](#3-api-reference--run_clustering)
-4. [Interpretando os Resultados](#4-interpretando-os-resultados)
-5. [Web UI — Interface Interativa](#5-web-ui--interface-interativa)
-6. [CLI — Linha de Comando](#6-cli--linha-de-comando)
-7. [Exemplos Completos](#7-exemplos-completos)
-8. [Perguntas Frequentes](#8-perguntas-frequentes)
+This normalization is retained from `legacy/mustache/resources/hai.pyx`.
+Changing it to a mean over unordered pairs without the factor (n−1)/n would
+change HAI. The dense helper's diagonal convention (1/n) does not contribute to
+HAI because it is identical in both hierarchies. The HAI matrix itself has a
+diagonal of exactly 1, is symmetric and lies in [0,1].
 
----
+HAI compares hierarchy structure, not merge-height differences or flat-label
+accuracy. It has not been replaced by TED, APTED, RTED, ARI, AMI or DBCV.
+Adapting tree edit distance to this purpose is unvalidated future work.
 
-## 1. Visão Geral
+The modern input is the fitted full single-linkage tree. Equal-height binary
+merges are treated as one simultaneous density-level cluster, so arbitrary
+serialization of a tied MST does not alter the comparison. The legacy
+`hierarchy_tree.pyx` reads an interval hierarchy and gives distance zero to points
+in the same terminal leaf. The inspected legacy launcher passes `compact=False`
+to Java; this flag alone does not establish equivalence of its terminal leaves
+to modern singleton leaves. Therefore the formula is preserved, but
+exact equality with every Java-generated hierarchy is not
+claimed. Equivalent representations and sample indexing are required to
+compare numerical results.
 
-O **MustaCHE** (*Multiple Cluster Hierarchies Explorer*) é uma ferramenta interativa, baseada na web, para explorar clustering hierárquico baseado em densidade. Ele permite analisar **múltiplas hierarquias de clustering** geradas sob uma ampla faixa de parâmetros de densidade (`mpts`) simultaneamente, oferecendo insights sobre:
+### Exact and sampled calculations
 
-- **Estabilidade de clusters** — quais clusters persistem em diferentes escalas;
-- **Estrutura do dataset** — como os dados se organizam hierarquicamente;
-- **Comparação entre métodos** — HDBSCAN, Core-SG, e variações.
+Up to 2,000 samples, the calculation evaluates every unordered distinct pair
+in float64. Above this threshold, it samples 50,000 uniform ordered distinct
+pairs **with replacement**, using NumPy PCG64 with seed 42. All hierarchies use
+the same sampled pairs.
 
-### 1.1 Arquitetura
+The estimator is `1 - ((n−1)/n) * mean(pairwise differences)`.
+The reported Hoeffding 95% absolute error bound applies to **each comparison**,
+not simultaneously to the entire matrix or the stability of meta-cluster
+assignments. Metadata records method, approximation status, n, pair count, seed,
+generator, normalization, tie policy and bound scope. The public Python HAI API
+allows overriding the exact threshold, budget and seed.
 
-```text
-┌─────────────────────────────────────────────────────────┐
-│              Web UI (Flask + Plotly + D3.js)            │
-├─────────────────────────────────────────────────────────┤
-│            Motor Analítico (mustache.core)              │
-│            - run_clustering()                           │
-│            - stability_analysis()                       │
-│            - hierarchy_extraction()                     │
-├─────────────────────────────────────────────────────────┤
-│               Backend Cython (core_sg)                  │
-│            - _mst_kruskal.pyd (MST em C otimizado)      │
-│            - _reweight.pyd (reponderação de arestas)    │
-└─────────────────────────────────────────────────────────┘
-```
+Approximate analyses can change representatives or meta-clusters when distances
+are close. Repeat with larger budgets or exact calculation when scientifically
+necessary. UI color-scale changes alter display contrast only: fixed 0–1,
+adaptive observed range, or robust range clipping the lowest 10% of off-diagonal
+values. Numeric HAI values are always available on hover.
 
----
+## Meta-clustering and medoids
 
-## 2. Instalação
+Meta-clustering treats each hierarchy as one object, using distance `1 - HAI`.
+The modern default uses scikit-learn HDBSCAN with min_samples=1, minimum cluster size 2 and
+single-cluster allowance. The Meta-Hierarchy Dendrogram uses SciPy single linkage
+on the same distances. This is an explicit modern choice, not a promise of the
+same legacy HDBSCAN/FOSC partition under every setting.
+HDBSCAN here groups hierarchy objects using HAI. This internal analysis stage
+does not change CORE-SG's role as the main engine that constructs the data
+hierarchies. CORE-SG also reuses HDBSCAN's MST and tree-processing components.
 
-### 2.1 Pré-requisitos
+For meta-cluster C, the medoid is the member minimizing
+`Σ(j in C) (1 - HAI(i,j))`. It represents a **hierarchy**, identified by `mpts`,
+not a data point. Ties choose the first member in increasing `mpts` order.
+The criterion is equivalent to `compute_medoid_elements` in
+`legacy/mustache/resources/hierarchies.py`.
 
-- Python 3.11.0 (64-bit)
-- Windows 10/11 (para as wheels pré-compiladas atuais)
-- Conexão com Internet
+One representative per group limits visual redundancy. Automatic meta-clustering
+outliers (label −1) are displayed separately and are not medoids. A distance
+threshold creates a different partition with a medoid for each resulting group;
+it does not produce HDBSCAN noise labels. The UI explicitly selects automatic
+or threshold mode, and shows a cut line only in threshold mode.
 
-### 2.2 Instalação via pip
+Manual branch selection defines non-overlapping meta-clusters from the clicked
+subtrees and updates their medoids immediately. A new ancestor/descendant
+selection replaces overlapping selected groups. Unselected hierarchies are not
+automatic outliers. Selected descendants are also saved and exported. This does
+not select clusters of dataset points. Full legacy FOSC controls are not exposed.
+Inspect any hierarchy opens a zoomable detailed plot with flat-cluster colors,
+black for noise, and hover sample indices, including non-medoids and outliers.
+Cluster colors do not imply corresponding clusters across different mpts.
 
-```powershell
-# Criar ambiente virtual
-python -m venv venv_mustache
-.\venv_mustache\Scripts\activate
+## Reachability Plots
 
-# Atualizar pip
-pip install --upgrade pip
+Every plot corresponds to its displayed `mpts` and fitted hierarchy. Samples
+are ordered by that tree's leaves; each bar is the merge height (cophenetic
+distance) of adjacent ordered leaves. This reconstructs the density-contour
+intent of legacy hierarchy-interval plots on the modern full tree.
 
-# Instalar o MustaCHE (puxa core-sg-mustache automaticamente)
-pip install --index-url https://test.pypi.org/simple \
-            --extra-index-url https://pypi.org/simple \
-            mustache-core==0.2.0
-```
+This geometry is **not OPTICS**. The previous implementation cached one OPTICS
+ordering and distance vector and changed only the labels for other `mpts`;
+those plots could not be interpreted as each representative's own geometry.
+New analyses do not use that cache. The first sample has no predecessor, so its
+bar is missing rather than a fabricated ceiling.
 
-### 2.3 Verificação
+An older project's saved OPTICS arrays remain viewable without recomputation,
+with a visible warning that geometry may be shared across `mpts`. Distances
+from a full tree need not match the legacy interval hierarchy's bars exactly.
 
-```python
-import mustache
-print(mustache.__version__)  # Esperado: 0.2.0
+## Configure an analysis
 
-from mustache.core import run_clustering
-print("Backend Cython ativo")  # Sem erros = sucesso
-```
+**Algorithm:** CORE-SG is the main workflow. It builds support once at the
+requested maximum `mpts` and reuses it for extraction. The auxiliary HDBSCAN
+baseline directly fits each requested hierarchy for comparison.
+Both preserve noise labels; CORE-SG's optional noise reassignment is disabled.
+Flat partitions use HDBSCAN reference-compatible selection on each tree with
+the requested minimum cluster size.
 
----
+**Minimum mpts / Maximum mpts / Step size:** sweep
+`range(min_mpts, max_mpts + 1, step)`. The maximum is a configured bound, not
+necessarily an evaluated value when the step does not land on it. Require at
+least three samples, `2 <= min_mpts <= max_mpts < n_samples`, and step >= 1.
+In batch mode minimum cluster size and density `mpts` are both set to each
+sweep value. The legacy form exposed minimum cluster size independently; this
+modern coupling can change flat partitions and is not legacy parameter parity.
+Small settings show fine structure and noise; large settings
+emphasize denser, coarser structures. Explore a small sweep before a large one.
 
-## 3. API Reference — `run_clustering`
+**Distance metric:** the end-to-end supported set for both algorithms is
+euclidean, manhattan, chebyshev, minkowski with p=2, and cosine.
+Minkowski p=2 is equivalent to Euclidean; arbitrary p is not exposed.
+HDBSCAN cosine uses the generic distance path, and zero vectors are rejected.
+Supremum corresponds conceptually to Chebyshev, but old aliases, angular and
+Pearson are not accepted. Backend support alone is not an end-to-end guarantee.
 
-### 3.1 Assinatura
+Clustering, mutual reachability and hierarchy plots all use the chosen metric.
+The optional single-analysis t-SNE map uses Euclidean distance for visualization,
+with seed 42; it does not define any clustering result. A failed projection
+falls back to feature coordinates and is labeled accordingly. No UMAP is
+implemented.
 
-```python
-from mustache.core import run_clustering
+**CSV:** numeric features only; labels are not automatically excluded from a
+numeric column. For the single-analysis API, provide reference labels separately
+as `labels_file` for ARI and AMI. Numeric CSV headers can look like data: select
+the explicit CSV-header option when needed. Missing/infinite feature values
+return an error.
 
-result = run_clustering(
-    X,
-    method='hdbscan',
-    min_cluster_size=5,
-    min_samples=None,
-    match_reference_implementation=True,
-    core_dist_n_jobs=1,
-    random_state=None
-)
-```
+## Save, reopen and export
 
-### 3.2 Parâmetros
+Save Analysis records a name, dataset name, sample count, algorithm, metric,
+minimum/maximum `mpts`, step, observed time and timestamp. The result payload
+contains HAI and its metadata, meta-linkage, active labels/medoids/outliers,
+automatic partition, threshold, manual selection and every hierarchy's labels,
+probabilities and geometry.
 
-| Parâmetro | Tipo | Padrão | Descrição |
-| :--- | :--- | :--- | :--- |
-| `X` | `np.ndarray` | *(obrigatório)* | Matriz de dados de forma `(n_samples, n_features)` |
-| `method` | `str` | `'hdbscan'` | Método de clustering: `'hdbscan'` ou `'core_sg'` |
-| `min_cluster_size` | `int` | `5` | Tamanho mínimo de um cluster |
-| `min_samples` | `int` ou `None` | `None` | Número mínimo de amostras em uma vizinhança (se `None`, usa `min_cluster_size`) |
-| `match_reference_implementation` | `bool` | `True` | Se `True`, usa o algoritmo de referência do HDBSCAN para reprodutibilidade |
-| `core_dist_n_jobs` | `int` | `1` | Número de jobs para computação de distância. `1` = single-thread (reprodutível); `-1` = todos os cores |
-| `random_state` | `int` ou `None` | `None` | Seed para reprodutibilidade |
+Projects & History reopens the saved data without clustering again. The sidebar
+and all coordinated views restore the active parameters and selection.
+Older project aliases are supported; missing parameters are inferred only where
+possible, and unavailable values are displayed as missing. Export CSV uses
+manually selected hierarchies, otherwise active representatives. Export ZIP
+includes metadata, results and the saved dataset.
 
-### 3.3 Retorno
-
-A função retorna um dicionário com as seguintes chaves:
-
-| Chave | Tipo | Descrição |
-| :--- | :--- | :--- |
-| `labels` | `np.ndarray` (int) | Rótulos de cluster para cada amostra (`-1` indica ruído) |
-| `probabilities` | `np.ndarray` (float) | Probabilidade de cada amostra pertencer ao seu cluster |
-| `cluster_persistence` | `np.ndarray` (float) | Estabilidade/persistência de cada cluster encontrado |
-| `cluster_sizes` | `dict` | Mapeamento `label` $\rightarrow$ tamanho |
-| `n_clusters` | `int` | Número de clusters encontrados (excluindo ruído) |
-| `hierarchy` | `list` (dict) | Estrutura hierárquica completa (dendrograma) |
-| `mst_edges` | `np.ndarray` | Arestas da Minimum Spanning Tree (se disponível) |
-
-### 3.4 Exemplo mínimo
-
-```python
-import numpy as np
-from mustache.core import run_clustering
-
-# Gerar dados sintéticos (3 blobs)
-rng = np.random.RandomState(42)
-X = np.vstack([
-    rng.randn(100, 2) + [2, 2],
-    rng.randn(100, 2) + [-2, -2],
-    rng.randn(100, 2) + [2, -2]
-])
-
-# Executar clustering
-result = run_clustering(X, method='hdbscan', min_cluster_size=10)
-
-print(f"Clusters encontrados: {result['n_clusters']}")
-print(f"Amostras rotuladas: {len(result['labels'])}")
-print(f"Rótulos únicos: {np.unique(result['labels'])}")
-```
-
----
-
-## 4. Interpretando os Resultados
-
-### 4.1 Rótulos (`labels`)
-
-- Cada valor inteiro $\ge 0$ representa um cluster;
-- `-1` indica que a amostra foi classificada como ruído (não pertence a nenhum cluster denso);
-- A quantidade de rótulos únicos (excluindo `-1`) é o número de clusters.
-
-### 4.2 Probabilidades (`probabilities`)
-
-- Valores entre $0$ e $1$;
-- Quanto mais próximo de 1, mais fortemente a amostra pertence ao seu cluster;
-- Útil para identificar amostras ambíguas (fronteira entre clusters).
-
-### 4.3 Persistência (`cluster_persistence`)
-
-- Mede quanto um cluster persiste ao longo de diferentes escalas de densidade;
-- Valores altos indicam clusters robustos e bem separados;
-- Valores baixos indicam clusters instáveis ou transitórios.
-
-$$\text{persistência}(C) = \int_{\lambda_{\min}}^{\lambda_{\max}} \frac{|C \cap \text{cluster}_{\lambda}|}{|C|} \, d\lambda$$
-
-### 4.4 Hierarquia (`hierarchy`)
-
-- Lista de dicionários representando cada nível de corte da árvore hierárquica;
-- Cada nível contém: `lambda_value`, `clusters`, `parent`, `stability`;
-- Permite visualizar o dendrograma completo na Web UI.
-
-### 4.5 Exportando para CSV
+## Python API and reproducibility
 
 ```python
 import pandas as pd
+from sklearn.datasets import make_blobs
+from mustache.core.batch import run_batch_clustering, analyze_batch_results
 
-df = pd.DataFrame({
-    'label': result['labels'],
-    'probability': result['probabilities']
-})
-df.to_csv('output/cluster_labels.csv', index=False)
+X, _ = make_blobs(n_samples=90, n_features=3, centers=3, random_state=42)
+results = run_batch_clustering(pd.DataFrame(X), 4, 8, 2,
+                               metric="manhattan", algorithm="core-sg")
+analysis = analyze_batch_results(results)
+assert analysis["ordered_mpts"] == [4, 6, 8]
+print(analysis["hai_computation"], analysis["medoids"])
 ```
 
----
+For one hierarchy, `mustache.core.run_clustering` accepts
+`min_cluster_size`, `min_samples`, `metric`, `algorithm`, `true_labels`
+and `compact`. Results contain labels, probabilities, linkage, geometry,
+metric and sample metadata. `compact=True` omits expensive individual
+dendrogram/map figures. The deprecated `precomputed_optics` parameter is accepted
+but not used; callers receive a deprecation warning.
 
-## 5. Web UI — Interface Interativa
-
-### 5.1 Iniciando o servidor
-
-```powershell
-mustache
-# ou, alternativamente:
-python -m mustache.cli
-```
-
-O servidor será iniciado em: `http://localhost:5000`
-
-### 5.2 Funcionalidades da Web UI
-
-| Aba | Funcionalidade |
-| :--- | :--- |
-| **Upload** | Carregar CSV com dados tabulares |
-| **Parâmetros** | Configurar `mpts`, `min_cluster_size`, método |
-| **Hierarquias** | Visualizar dendrogramas interativos (Plotly + D3.js) |
-| **Estabilidade** | Heatmap de estabilidade de clusters vs. `mpts` |
-| **Comparação** | Comparar múltiplas hierarquias lado a lado |
-| **Exportar** | Baixar CSVs, JSONs e PNGs dos gráficos |
-
-### 5.3 Fluxo de uso típico
-
-1. Upload do CSV (ex: `dataset_iris.csv`)
-2. Selecionar faixa de `mpts`: `[5, 50]`, passo `5`
-3. Executar clustering
-4. Explorar hierarquias na aba "Hierarquias"
-5. Analisar estabilidade na aba "Estabilidade"
-6. Exportar resultados
-
----
-
-## 6. CLI — Linha de Comando
-
-### 6.1 Comando principal
-
-```powershell
-mustache --help
-```
-
-### 6.2 Subcomandos
-
-```powershell
-# Executar clustering em um CSV
-mustache cluster dados.csv --method hdbscan --min-cluster-size 10
-
-# Gerar relatório de estabilidade
-mustache stability dados.csv --mpts-range 5 50 5
-
-# Iniciar a Web UI
-mustache serve --port 5000
-```
-
----
-
-## 7. Exemplos Completos
-
-### 7.1 Clustering em dataset real (Iris)
-
-```python
-import numpy as np
-import pandas as pd
-from mustache.core import run_clustering
-from sklearn.datasets import load_iris
-
-# Carregar dataset
-iris = load_iris()
-X = iris.data
-
-# Executar clustering
-result = run_clustering(X, method='hdbscan', min_cluster_size=5)
-
-# Exibir resultados
-print(f"Clusters: {result['n_clusters']}")
-print(f"Silhouette score: {result.get('silhouette_score', 'N/A')}")
-
-# Exportar
-df = pd.DataFrame(X, columns=iris.feature_names)
-df['cluster'] = result['labels']
-df['probability'] = result['probabilities']
-df.to_csv('iris_clusters.csv', index=False)
-```
-
-### 7.2 Análise de estabilidade em múltiplos `mpts`
-
-```python
-import numpy as np
-from mustache.core import run_clustering
-
-# Dados sintéticos com estrutura multi-escala
-rng = np.random.RandomState(42)
-X = np.vstack([
-    rng.randn(150, 2) * 0.5 + [0, 0],
-    rng.randn(150, 2) * 0.5 + [5, 5],
-    rng.randn(150, 2) * 2.0 + [2.5, 0]
-])
-
-# Executar para diferentes valores de mpts
-mpts_values = [5, 10, 15, 20, 30, 50]
-stability_results = []
-
-for mpts in mpts_values:
-    result = run_clustering(X, method='hdbscan',
-                            min_cluster_size=mpts,
-                            core_dist_n_jobs=1)
-    stability_results.append({
-        'mpts': mpts,
-        'n_clusters': result['n_clusters'],
-        'mean_persistence': np.mean(result['cluster_persistence'])
-            if len(result['cluster_persistence']) > 0 else 0.0
-    })
-
-# Exibir tabela
-for r in stability_results:
-    print(f"mpts={r['mpts']:>3} | clusters={r['n_clusters']} | "
-          f"persistência média={r['mean_persistence']:.3f}")
-```
-
-### 7.3 Visualização da hierarquia
-
-```python
-import plotly.graph_objects as go
-from mustache.core import run_clustering
-import numpy as np
-
-# Gerar dados e executar clustering
-X = np.random.RandomState(42).randn(300, 2)
-result = run_clustering(X, method='hdbscan', min_cluster_size=10)
-
-# Extrair hierarquia
-hierarchy = result['hierarchy']
-
-# Plotar dendrograma simplificado
-lambdas = [h['lambda_value'] for h in hierarchy]
-n_clusters = [len(h['clusters']) for h in hierarchy]
-
-fig = go.Figure(data=go.Scatter(x=lambdas, y=n_clusters, mode='lines+markers'))
-fig.update_layout(
-    title='Dendrograma: Clusters vs. Lambda',
-    xaxis_title='Lambda (1/distância)',
-    yaxis_title='Número de clusters'
-)
-fig.write_html('dendrograma.html')
-fig.show()
-```
-
----
-
-## 8. Perguntas Frequentes
-
-- **Por que preciso do Python 3.11 especificamente?**  
-  As wheels pré-compiladas publicadas no TestPyPI foram geradas para `cp311-win_amd64`. Outras versões do Python exigiriam recompilação (trabalho futuro via `cibuildwheel`).
-
-- **O que significa `match_reference_implementation=True`?**  
-  Garante que o algoritmo siga a implementação de referência do HDBSCAN original (Campello et al., 2013), assegurando reprodutibilidade entre diferentes máquinas e versões.
-
-- **Por que `core_dist_n_jobs=1` é recomendado?**  
-  Execuções paralelas podem introduzir não-determinismo na ordem de processamento de pontos equidistantes. Para reprodutibilidade científica, use 1.
-
-- **Como exportar a hierarquia para outro formato?**  
-  A chave `hierarchy` do resultado é uma lista de dicionários Python, facilmente serializável em JSON:
-
-```python
-import json
-with open('hierarquia.json', 'w') as f:
-    json.dump(result['hierarchy'], f, indent=2)
-```
-
-- **Posso usar GPU para acelerar?**  
-  Atualmente, o backend Cython é CPU-only. Suporte a GPU está no roadmap futuro.
-
-- **Como citar o MustaCHE?**  
-```bibtex
-@software{mustache2026,
-  title   = {MustaCHE: Multiple Cluster Hierarchies Explorer},
-  author  = {[autores]},
-  year    = {2026},
-  url     = {https://test.pypi.org/project/mustache-core/},
-  version = {0.2.0}
-}
-```
-
----
-
-## Referências
-
-- Campello, R. J. G. B., et al. "Density-Based Clustering Based on Hierarchical Density Estimates." PAKDD 2013.
-- Documentação oficial do HDBSCAN: <https://hdbscan.readthedocs.io/>
-- Core-SG (base do backend): <https://github.com/gabrieljorliano/core-sg>
-- MustaCHE no TestPyPI: <https://test.pypi.org/project/mustache-core/0.2.0/>
+See [Reproduction](reproducao.md) and the
+[review with original-to-modern mapping](technical_review_2026-09-26.md).
+The Portuguese PIBIC manuscript and development-context notes are retained as
+research records, excluded from the English public documentation site.

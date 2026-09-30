@@ -1,34 +1,47 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: "Cite this modern software release and the original MustaCHE and CORE-SG papers. See AUTHORS.md for historical attribution and supervision."
+type: software
 authors:
-  - family-names: "Araujo Neto"
-    given-names: "Antonio Cavalcante"
-  - family-names: "Nascimento"
-    given-names: "Mario A."
-  - family-names: "Sander"
-    given-names: "Joerg"
-  - family-names: "Campello"
-    given-names: "Ricardo J. G. B."
-title: "MustaCHE: A Multiple Clustering Hierarchies Explorer"
-version: 2.0.0
-date-released: 2025-02-19
+  - family-names: "de Melo"
+    given-names: "Maylon Martins"
+    affiliation: "Departamento de Computação, Universidade Federal de São Carlos (UFSCar)"
+title: "MustaCHE: CORE-SG-centered modern explorer"
+version: 0.3.0
+repository-code: "https://github.com/Maylon-hub/mustache"
 url: "https://github.com/maylon-hub/mustache"
 license: BSD-3-Clause
-preferred-citation:
-  type: article
-  authors:
-    - family-names: "Araujo Neto"
-      given-names: "Antonio Cavalcante"
-    - family-names: "Nascimento"
-      given-names: "Mario A."
-    - family-names: "Sander"
-      given-names: "Joerg"
-    - family-names: "Campello"
-      given-names: "Ricardo J. G. B."
-  journal: "Proceedings of the VLDB Endowment"
-  title: "MustaCHE: A Multiple Clustering Hierarchies Explorer"
-  year: 2018
-  volume: 11
-  issue: 12
-  pages: 2058-2061
-  doi: "10.14778/3229863.3236259"
+references:
+  - type: article
+    authors:
+      - family-names: "Araujo Neto"
+        given-names: "Antonio Cavalcante"
+      - family-names: "Nascimento"
+        given-names: "Mario A."
+      - family-names: "Sander"
+        given-names: "Joerg"
+      - family-names: "Campello"
+        given-names: "Ricardo J. G. B."
+    journal: "Proceedings of the VLDB Endowment"
+    title: "MustaCHE: A Multiple Clustering Hierarchies Explorer"
+    year: 2018
+    volume: 11
+    issue: 12
+    start: 2058
+    end: 2061
+    doi: "10.14778/3229863.3236259"
+  - type: conference-paper
+    title: "CORE-SG: Efficient Computation of Multiple MSTs for Density-Based Methods"
+    authors:
+      - family-names: "Araujo Neto"
+        given-names: "Antonio Cavalcante"
+      - family-names: "Naldi"
+        given-names: "Murilo Coelho"
+      - family-names: "Campello"
+        given-names: "Ricardo J. G. B."
+      - family-names: "Sander"
+        given-names: "Jorg"
+    year: 2022
+    collection-title: "2022 IEEE 38th International Conference on Data Engineering (ICDE)"
+    start: 951
+    end: 964
+    doi: "10.1109/ICDE53745.2022.00076"

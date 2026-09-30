@@ -60,6 +60,19 @@ class TestRunBatchClustering:
             assert result['algorithm'] == 'hdbscan', \
                 f"Algorithm field mismatch for mpts={mpts_key}"
 
+    def test_batch_uses_compact_visualization_payload(self, blobs_100):
+        X, _ = blobs_100
+        df = _df_from_array(X)
+        results = run_batch_clustering(df, min_mpts=5, max_mpts=5, step=1, algorithm='hdbscan')
+        result = results['5']
+
+        assert result['dendrogram_json'] is None
+        assert result['map_json'] is None
+        assert result['reachability_json'] is None
+        assert len(result['reachability_data']['x']) == X.shape[0]
+        assert len(result['reachability_data']['y']) == X.shape[0]
+        assert len(result['reachability_data']['labels']) == X.shape[0]
+
 
 class TestAnalyzeBatchResults:
     """Tests on the meta-analysis pipeline (HAI + meta-clustering)."""
@@ -137,3 +150,44 @@ class TestAnalyzeBatchResults:
         expected_sorted = sorted([int(k) for k in batch_results.keys()])
         assert list(ordered_mpts) == expected_sorted, \
             "ordered_mpts must match the sorted batch keys"
+
+    def test_outliers_are_exposed_for_the_ui(self, blobs_100):
+        X, _ = blobs_100
+        analysis = analyze_batch_results(self._run_batch(X))
+        assert isinstance(analysis.get('outliers'), list)
+        assert all(value in analysis['ordered_mpts'] for value in analysis['outliers'])
+
+    def test_meta_dendrogram_branches_identify_their_mpts(self, blobs_100):
+        import json
+        X, _ = blobs_100
+        analysis = analyze_batch_results(self._run_batch(X))
+        figure = json.loads(analysis['meta_dendrogram_json'])
+        branch_traces = [trace for trace in figure['data'] if trace.get('meta', {}).get('mpts_values')]
+        assert branch_traces
+        valid_mpts = set(analysis['ordered_mpts'])
+        for trace in branch_traces:
+            assert set(trace['meta']['mpts_values']).issubset(valid_mpts)
+        assert analysis['hai_computation']['method'] in {'exact-condensed', 'sampled-pairs'}
+
+    def test_internal_node_targets_match_linkage_descendants(self, blobs_100):
+        import json
+        X, _ = blobs_100
+        analysis = analyze_batch_results(self._run_batch(X))
+        figure = json.loads(analysis['meta_dendrogram_json'])
+        ordered = analysis['ordered_mpts']
+        n_leaves = len(ordered)
+        targets = [trace for trace in figure['data'] if trace.get('meta', {}).get('role') == 'branch-targets']
+        assert len(targets) == 1
+        target = targets[0]
+        assert figure['layout']['hovermode'] == 'closest'
+        assert target['mode'] == 'markers'
+        assert target['marker']['color'] != 'rgba(0,0,0,0)'
+        assert len(target['x']) == len(target['y']) == len(target['customdata']) == n_leaves - 1
+        assert set(target['customdata']) == set(range(n_leaves, 2 * n_leaves - 1))
+
+        members = {index: [ordered[index]] for index in range(n_leaves)}
+        for index, row in enumerate(analysis['meta_linkage']):
+            members[n_leaves + index] = sorted(members[int(row[0])] + members[int(row[1])])
+        for node_id in target['customdata']:
+            assert target['meta']['branch_members'][str(node_id)] == members[node_id]
+        assert all(trace['mode'] == 'lines' for trace in figure['data'][:-1])

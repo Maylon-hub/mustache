@@ -1,0 +1,90 @@
+site_name: MustaCHE Docs
+site_description: Scientific and user documentation for MustaCHE — Multiple Cluster Hierarchies Explorer.
+site_author: Maylon Martins de Melo
+site_url: https://maylon-hub.github.io/mustache/
+repo_name: Maylon-hub/mustache
+repo_url: https://github.com/Maylon-hub/mustache
+edit_uri: edit/mustache-core-sg/docs/
+
+# Keep reports, bibliographies, PDFs and local build inputs in the repository
+# without exposing them as pages or downloads on the public documentation site.
+exclude_docs: |
+  *.bib
+  *.pdf
+  *.tex
+  *.resolved
+  auditoria_entrega_pibic.md
+  CONTEXTO_DESENVOLVIMENTO.md
+  benchmark_report.md
+  benchmark_report_canonical_hdbscan.md
+  implementation_plan.md
+  relatorio_empacotamento_wheels_e_testpypi.md
+  requirements-docs.txt
+  final_audit_2026-09-27.md
+  final_summary_2026-09-27.md
+
+theme:
+  name: material
+  language: en
+  logo: assets/mustache-mark.svg
+  favicon: assets/mustache-mark.svg
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark theme
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light theme
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.action.edit
+    - search.suggest
+    - search.highlight
+
+nav:
+  - Home: index.md
+  - User guide: guia_documentacao.md
+  - Reproduction: reproducao.md
+  - Release candidate: rc_preparation.md
+  - Technical review: technical_review_2026-09-26.md
+  - Quickstart notebook: https://github.com/Maylon-hub/mustache/blob/mustache-core-sg/examples/mustache_quickstart.ipynb
+  - Source code: https://github.com/Maylon-hub/mustache
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Maylon-hub/mustache
+
+extra_css:
+  - stylesheets/mustache.css
+
+copyright: Copyright &copy; 2026 Maylon Martins de Melo — BSD 3-Clause
