@@ -1,6 +1,11 @@
-# Reproducing the unpublished candidate
+# Historical RC preparation (not the current installation guide)
 
-Pair **mustache-core 0.3.0rc3 + core-sg-mustache 0.4.5rc3**. No upload is implied.
+This page archives the pre-publication procedure for the `rc3` pair. The
+stable `mustache-core==0.3.0` and `core-sg-mustache==0.4.5` packages are now
+published on TestPyPI; use [Installation](installation.md) for current setup.
+
+Historical pair: **mustache-core 0.3.0rc3 + core-sg-mustache 0.4.5rc3**. The
+steps below describe qualification before that upload, not the current state.
 Native HDBSCAN 0.8.44 is pinned: both projects use its private tree API, not just
 scikit-learn's public HDBSCAN estimator. Future versions need qualification.
 

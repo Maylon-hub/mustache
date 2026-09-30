@@ -10,6 +10,7 @@ with HAI and preserve your analysis decisions. CORE-SG is the principal engine;
 HDBSCAN is available as an auxiliary experimental baseline.
 
 [Read the user guide](guia_documentacao.md){ .md-button .md-button--primary }
+[Install the stable release](installation.md){ .md-button }
 [Open GitHub](https://github.com/Maylon-hub/mustache){ .md-button }
 
 ## Exploration workflow
@@ -32,5 +33,8 @@ Read the [scientific and usage guide](guia_documentacao.md),
 [technical review](technical_review_2026-09-26.md) before treating the modern
 full-tree representation as numerically identical to the legacy interval tree.
 
-The documentation describes the source checkout. Unreleased review fixes are
-not present in previously published packages.
+The stable `mustache-core==0.3.0` and `core-sg-mustache==0.4.5` packages are
+available on TestPyPI, not official PyPI. CPython 3.11 on Windows x86-64 and
+Linux x86-64 is qualified; macOS remains unqualified. Start with the
+[installation guide](installation.md) or use the
+[strict reproduction procedure](reproducao.md).

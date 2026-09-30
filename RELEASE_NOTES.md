@@ -1,9 +1,11 @@
 # MustaCHE 0.3.0
 
-Unpublished stable candidate paired with `core-sg-mustache==0.4.5` and pinned
-`hdbscan==0.8.44`. The TestPyPI `0.3.0rc3` / `0.4.5rc3` pair remains the
-immutable pre-release record. No new scientific or UI behavior is introduced
-relative to that qualified RC; these final artifacts require requalification.
+Stable `mustache-core==0.3.0`, paired with `core-sg-mustache==0.4.5` and
+pinned `hdbscan==0.8.44`, is published on TestPyPI. Official PyPI publication
+is deferred. The TestPyPI `0.3.0rc3` / `0.4.5rc3` pair remains the historical
+immutable pre-release record. No new scientific or UI behavior was introduced
+relative to the qualified RC; the final stable artifacts passed separate
+Windows/Linux qualification.
 
 ## Highlights
 
@@ -23,7 +25,7 @@ relative to that qualified RC; these final artifacts require requalification.
 ## Supported platforms
 
 Windows x86-64 and Linux x86-64 (glibc >= 2.28), **CPython 3.11 only**.
-Both stable wheel/sdist paths must pass new clean-install, full-suite, docs
+Both stable wheel/sdist paths passed clean-install, full-suite, docs
 and physical-browser qualification. macOS and other Python versions are not
 qualified, not declared incompatible.
 
