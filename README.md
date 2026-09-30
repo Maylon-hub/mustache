@@ -1,282 +1,164 @@
-# MustaCHE (Multiple Cluster Hierarchies Explorer)
+# MustaCHE — Multiple Cluster Hierarchies Explorer
 
-![TestPyPI Version](https://img.shields.io/badge/TestPyPI-mustache--core%20v0.2.0-blue)
-![Backend Version](https://img.shields.io/badge/backend-core--sg--mustache%20v0.3.0-green)
-![Python Version](https://img.shields.io/badge/python-3.11-blue)
-![Platform](https://img.shields.io/badge/platform-win__amd64-lightgrey)
+MustaCHE is a visual, interactive explorer centered on the CORE-SG engine.
+It explores multiple density-based clustering hierarchies for a range of
+`mpts` values, compares them with the Hierarchy Agreement Index (HAI), groups
+similar hierarchies into meta-clusters and displays one representative hierarchy
+(medoid) per group.
 
-**MustaCHE** is an interactive web-based visual analytics tool for exploring hierarchical density-based clustering. It enables users to analyze multiple clustering hierarchies generated across a wide range of density parameters ($m_{pts}$) simultaneously, offering deep insights into cluster stability, hierarchy relationships, and data partitioning.
+This repository modernizes the original MustaCHE by Antonio Cavalcante Araujo
+Neto, Mario A. Nascimento, Joerg Sander and Ricardo J. G. B. Campello. The original
+implementation is preserved in [legacy/](legacy/). The modern application uses
+Python, Flask and Plotly with CORE-SG as the default engine. A separate HDBSCAN
+engine is available as an auxiliary experimental baseline. Java is not required.
+CORE-SG contains compiled Cython extensions, so the complete dependency stack is
+not pure Python.
 
-In **MustaCHE v2**, the application has been completely re-engineered into a **100% native Python package** (`mustache-core`), removing all legacy Java and Docker dependencies. It integrates the state-of-the-art **Core-SG (Core Structure Graph)** engine with Cython acceleration (`core-sg-mustache`) for ultra-fast Minimum Spanning Tree (MST) computation and includes a built-in Command Line Interface (CLI).
+CORE-SG builds reusable support for extracting hierarchies at different density
+parameters. HDBSCAN also supplies internal tree-processing routines and automatic
+meta-clustering; those technical dependencies are separate from choosing the
+HDBSCAN baseline engine. Baseline comparisons are scoped checks, not universal
+requirements for CORE-SG behavior or substitutes for experiments against RNG.
 
----
+## Current source and installation
 
-## 🌟 Key Features
+The unpublished stable candidate is `mustache-core==0.3.0`, paired with
+`core-sg-mustache==0.4.5` and `hdbscan==0.8.44`. The qualified `0.3.0rc3` /
+`0.4.5rc3` pair remains available on TestPyPI as an immutable pre-release
+record. See [release notes](RELEASE_NOTES.md),
+[citation roles](AUTHORS.md), [dataset provenance](DATASETS.md), and the
+[historical RC reproduction procedure](docs/rc_preparation.md).
 
-- **100% Native Python**: No Docker or Java required. Install and run directly via Python/pip.
-- **Core-SG & HDBSCAN Integration**: Accelerated density-based clustering powered by `core-sg-mustache` for scalable multiple MST extractions.
-- **Pre-compiled Wheels**: Windows 64-bit pre-compiled binaries available on TestPyPI—no C++ compiler or Visual Studio required for installation.
-- **Optimized Reachability Plots**: Built-in OPTICS caching mechanism speeding up reachability rendering during batch processing.
-- **Interactive Visualizations (Plotly.js & D3.js)**:
-  - **Meta-Clustering Dendrogram**: Hierarchically cluster different parameter configurations with dynamic cut thresholding.
-  - **HAI Similarity Matrix**: Visualizes structural agreement between clustering partitions across parameter ranges.
-  - **Reachability Plot**: Highlights density valleys corresponding to physical clusters.
-  - **2D Projection Scatter Map**: Spatial projection powered by t-SNE / UMAP.
-- **CLI & Web Dashboard**: Run with a single command (`mustache`) or import functions directly into Python scripts and Jupyter Notebooks.
-- **Ground Truth Validation**: Support for external label files to calculate Adjusted Rand Index (ARI) and Adjusted Mutual Information (AMI).
+This stable candidate targets **Windows x86-64 and Linux x86-64**, with
+**CPython 3.11 only**. Its new wheel/sdist artifacts require separate
+Windows/Linux qualification before publication. Linux wheels target manylinux with
+glibc >= 2.28. macOS is **not currently qualified / future work**, not known
+to be incompatible. Python 3.10, 3.12 and 3.13 are outside this release's declared
+support until independently qualified.
 
----
+Use CPython 3.11 and an isolated environment. For development of both checkouts:
 
-## 🚀 Quick Start (Running via Python Package)
-
-### Prerequisites
-
-- **Python 3.11.0 (64-bit)** recommended for using pre-built wheels.
-- No C++ compilers or Visual Studio required for end users on Windows 64-bit when installing official pre-built wheels (`.whl`).
-
-### 1. Create and Activate a Virtual Environment
-
-It is strongly recommended to install the package in an isolated virtual environment:
-
-```bash
-# Create virtual environment (.venv)
+```powershell
+git clone --branch release/mustache-0.3.0 https://github.com/Maylon-hub/mustache.git
+git clone --branch release/core-sg-0.4.5 https://github.com/Maylon-hub/core-sg.git
+cd mustache
 python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e ../core-sg
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m mustache.cli --help
+.\.venv\Scripts\python.exe -m mustache.cli
 ```
 
-Activate the environment based on your operating system and shell:
+Building CORE-SG from source requires a compatible C/C++ compiler. A compatible
+binary wheel avoids compilation. On Linux use `.venv/bin/python`.
+See [reproduction instructions](docs/reproducao.md) for import provenance and
+candidate-package installation. Wheel availability and test results on other
+platforms must be checked for the specific release.
 
-- **Windows (PowerShell)**:
-  ```powershell
-  .\.venv\Scripts\Activate.ps1
-  ```
-  > [!TIP]
-  > **PowerShell Script Execution Error (`PSSecurityException`)?**  
-  > If Windows blocks the script execution, run this command **once** in PowerShell to allow virtual environment scripts for your current user:
-  > ```powershell
-  > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-  > ```
-  > Press `Y` (or `S`) when prompted, then re-run `.\.venv\Scripts\Activate.ps1`.
-- **Windows (Command Prompt / CMD)**:
-  ```cmd
-  .\.venv\Scripts\activate.bat
-  ```
-- **Windows (Git Bash)**:
-  ```bash
-  source .venv/Scripts/activate
-  ```
-- **Linux / macOS (Bash / Zsh)**:
-  ```bash
-  source .venv/bin/activate
-  ```
+Open `http://127.0.0.1:5000`. The `mustache` CLI launches the local Web UI;
+it has host, port and debug options, not batch-processing subcommands.
 
-### 2. Upgrade pip
+## Scientific workflow
 
-Ensure `pip` is updated to avoid build or dependency resolution issues:
+1. Open **Datasets** for Iris, Wine, Breast Cancer Wisconsin or deterministic
+   synthetic datasets, or upload a CSV with numeric features.
+2. Keep the default **CORE-SG** engine, or choose **HDBSCAN (comparison baseline)**.
+   Set **Minimum mpts**, **Maximum mpts**, **Step size** and
+   **Distance metric**. Specify whether the CSV has a header when automatic
+   detection is ambiguous.
+3. Inspect the **HAI Similarity Matrix** and **Meta-Hierarchy Dendrogram**.
+   The matrix uses increasing `mpts` order; dendrogram leaves may be reordered.
+4. Use automatic meta-clustering or select a distance threshold. Clicking a
+   branch with the selection tool switches to manual mode: its descendants
+   form a meta-cluster and its representative is recalculated. Additional
+   non-overlapping branches form additional groups; overlapping selections
+   replace earlier groups.
+5. Inspect **Reachability Plots** for representatives and separately identified
+   meta-clustering outliers. Use the hierarchy inspector for any other `mpts`,
+   with zoom and flat-cluster colors; point labels are local to that hierarchy.
+6. **Save Analysis**, then reopen it from **Projects & History** without rerunning
+   clustering. **Export CSV** exports selected hierarchies, or active
+   representatives when there is no manual selection.
 
-```bash
-python -m pip install --upgrade pip
-```
+In batch mode, `mpts` controls both the density-neighborhood parameter and minimum
+cluster size; the legacy application exposed minimum cluster size separately.
+The maximum bound is inclusive when reached by the selected step; for example
+2..8 with step 2 yields 2, 4, 6, 8. Require
+`2 <= min_mpts <= max_mpts < n_samples` and a positive step.
 
-### 3. Install mustache-core
+Both algorithms support **euclidean, manhattan, chebyshev, minkowski (p=2)** and
+**cosine** in this application. Cosine is a dissimilarity and requires non-zero
+vectors. Angular, Pearson, supremum aliases and precomputed matrices are not
+advertised as supported modern UI inputs. Invalid combinations return an error.
 
-A single `pip install` command installs MustaCHE along with all required dependencies—including the **`core-sg-mustache`** backend engine, Flask, NumPy, Pandas, Scikit-Learn, Scipy, HDBSCAN, and Plotly. **End users do not need to install `core-sg-mustache` separately.**
+HAI remains the primary hierarchy comparison: it compares normalized sizes of
+lowest-common-ancestor clusters for point pairs. Exact calculation is used up
+to 2,000 samples. Larger analyses use deterministic sampled pairs, explicitly
+labeled approximate and accompanied by a seed, sample budget, sampling method
+and per-comparison error bound.
 
-- **From TestPyPI (Current release v0.2.0)**:
-  ```bash
-  pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ mustache-core==0.2.0
-  ```
+The representative hierarchy is the medoid minimizing the sum of distances
+`1 - HAI` within its meta-cluster. It is not a representative data point.
+ARI and AMI evaluate flat labels against supplied reference labels; DBCV is not
+implemented. None replaces HAI.
 
-- **From PyPI (Official release)**:
-  *Coming soon*
+Reachability geometry is now derived from each fitted hierarchy, using
+adjacent-leaf merge heights. It is not a shared OPTICS layout. The first ordered
+sample has no predecessor and is shown as undefined. Read the
+[scientific guide](docs/guia_documentacao.md) for differences from the legacy
+hierarchy representation and FOSC workflow.
 
-> [!TIP]
-> **Automatic Dependency Resolution**: Because `core-sg-mustache` is declared in `mustache-core`'s package specifications (`pyproject.toml`), `pip` automatically discovers and installs `core-sg-mustache` without any separate commands.
-
-> [!NOTE]
-> The package is named **`mustache-core`** for installation via `pip`, but inside Python scripts and notebooks you import it as:
-> ```python
-> import mustache
-> ```
-
-### 4. Launch the Application
-
-Run the built-in CLI command in your terminal:
-
-```bash
-mustache
-```
-
-Custom host and port options:
-```bash
-mustache --host 127.0.0.1 --port 5000 --debug
-```
-
-*(Alternative command if the global script is not directly resolved in your shell)*:
-```bash
-python -m mustache.cli
-```
-
-Once started, open your web browser and navigate to:
-👉 **`http://127.0.0.1:5000`**
-
----
-
-## 🛠️ Local Development Setup (From Source Code)
-
-If you are developing locally or contributing to the codebase, follow these steps to run MustaCHE directly from source without Docker.
-
-### Prerequisites
-
-- **Python 3.11.0 (64-bit)**
-- **Git**
-
-### Step-by-Step Guide
-
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/maylon-hub/mustache.git
-   cd mustache
-   ```
-
-2. **Create and Activate a Virtual Environment**:
-   - **Windows (PowerShell)**:
-     ```powershell
-     python -m venv .venv
-     .\.venv\Scripts\Activate.ps1
-     ```
-     *(If script execution is blocked, run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` once)*
-   - **Windows (Command Prompt / CMD)**:
-     ```cmd
-     .\.venv\Scripts\activate.bat
-     ```
-   - **Windows (Git Bash)**:
-     ```bash
-     source .venv/Scripts/activate
-     ```
-   - **Linux / macOS**:
-     ```bash
-     python3 -m venv .venv
-     source .venv/bin/activate
-     ```
-
-3. **Install Dependencies and the Package in Editable Mode**:
-   ```bash
-   python -m pip install --upgrade pip
-   pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ -e .
-   ```
-
-   > [!NOTE]
-   > - If developing both packages simultaneously from source, build and install your local clone of `core-sg-mustache` first:
-   >   ```bash
-   >   pip install -e ../core-sg
-   >   pip install -e .
-   >   ```
-
-4. **Start the Application**:
-   You can run the server via the CLI command:
-   ```bash
-   mustache
-   ```
-
-   Or run it directly as a Python module:
-   ```bash
-   python -m mustache.cli
-   ```
-
-5. **Open the Dashboard**:
-   Open your browser at **`http://127.0.0.1:5000`**.
-
----
-
-## 🐍 Using MustaCHE as a Python Library
-
-You can import MustaCHE algorithms directly into your Python scripts or Jupyter Notebooks:
+## Python API
 
 ```python
 import pandas as pd
+from sklearn.datasets import make_blobs
 from mustache.core import run_clustering
-from mustache.core.batch import run_batch_clustering
+from mustache.core.batch import run_batch_clustering, analyze_batch_results
 
-# Load numerical dataset
-df = pd.read_csv("datasets/sample_data.csv", header=None)
+X, truth = make_blobs(n_samples=90, centers=3, random_state=42)
+data = pd.DataFrame(X)
+single = run_clustering(data, min_cluster_size=5, min_samples=5,
+                        algorithm="core-sg", metric="manhattan",
+                        true_labels=truth, compact=True)
+results = run_batch_clustering(data, min_mpts=4, max_mpts=8, step=2,
+                               algorithm="core-sg", metric="euclidean")
+analysis = analyze_batch_results(results)
+print(analysis["ordered_mpts"], analysis["medoids"])
 
-# 1. Run single clustering analysis
-result = run_clustering(
-    df, 
-    min_cluster_size=5, 
-    min_samples=5, 
-    metric="euclidean", 
-    algorithm="core-sg"  # Options: 'core-sg' or 'hdbscan'
-)
-print(f"Number of clusters found: {result['n_clusters']}")
-
-# 2. Run batch parameter exploration (mpts sweep)
-batch_results = run_batch_clustering(
-    df, 
-    min_mpts=5, 
-    max_mpts=25, 
-    step=2, 
-    metric="euclidean", 
-    algorithm="core-sg"
-)
-print(f"Processed {len(batch_results['results'])} hierarchies.")
+# Optional comparison on the same dataset, sweep and metric:
+# baseline = run_batch_clustering(data, 4, 8, 2,
+#                                 algorithm="hdbscan", metric="euclidean")
 ```
 
----
+CORE-SG builds its support once at `max_mpts`, then extracts each requested
+hierarchy from that instance. A single-analysis t-SNE map uses Euclidean geometry
+for visualization only; it does not affect clustering, HAI or representatives.
+The [quickstart notebook](examples/mustache_quickstart.ipynb) provides another
+executable example.
 
-## 📖 Usage Guide
+## Tests, evidence and limitations
 
-### 1. Upload Dataset
-- Under the **Dataset (CSV)** section, upload a CSV file containing numerical feature values (comma-separated).
-
-### 2. (Optional) Ground Truth Labels
-- Upload a single-column CSV containing integer cluster labels to calculate ARI and AMI validation metrics.
-
-### 3. Configure Clustering Parameters
-- **Min Cluster Size**: Smallest grouping considered a valid cluster.
-- **Min Samples**: Density threshold / neighborhood size.
-- **Distance Metric**: `Euclidean` or `Manhattan`.
-- **Algorithm**: `core-sg` (recommended for fast Cython MST computation) or `hdbscan` (standalone reference HDBSCAN).
-
-### 4. Batch Analysis
-- In the **Batch Analysis** section, define a range of $m_{pts}$ values (`Min`, `Max`, `Step`).
-- MustaCHE runs the hierarchy sweep, calculates the HAI similarity matrix, builds the meta-clustering dendrogram, and caches the reachability plots.
-
-### 5. Export Results
-- Click **"Export JSON"** to download metrics, cluster labels, and chart data.
-
----
-
-## 📁 Project Structure
-
-```
-mustache/
-├── datasets/                 # Sample datasets for testing (CSV format)
-├── docs/                     # Detailed documentation & reproducibility guides
-│   ├── guia_documentacao.md  # API reference & user guide
-│   └── reproducao.md         # Reproducibility manual
-├── mustache/                 # Main Python package
-│   ├── __init__.py           # Flask application factory
-│   ├── cli.py                # Command Line Interface (CLI) entrypoint
-│   ├── routes.py             # Flask HTTP routes and API endpoints
-│   ├── core/                 # Core clustering algorithms and logic
-│   │   ├── __init__.py       # Core module exports
-│   │   ├── clustering.py     # HDBSCAN & Core-SG clustering runner
-│   │   ├── batch.py          # Batch parameter exploration & caching
-│   │   └── hai.py            # Hierarchy Agreement Index calculation
-│   ├── static/               # CSS, Plotly JS, and image assets
-│   └── templates/            # HTML templates (dashboard, settings, etc.)
-├── MANIFEST.in               # Manifest rules for non-code packaging
-├── pyproject.toml            # PEP 517/518 build and metadata configuration
-├── requirements.txt          # Development dependencies
-└── README.md                 # Project documentation
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
----
+The suite includes known HAI values, symmetry, diagonal/range, sampled-pair
+metadata, medoid selection, CORE-SG reuse and reference equivalence, metric
+validation, saved projects, cuts and restoration. Test results and observed
+limitations are recorded in the [technical review](docs/technical_review_2026-09-26.md).
+Historical benchmark timings are not validation of the corrected checkout.
 
-## 📄 License & Credits
+The current server is a single-user local research application with in-memory
+analysis state. It is not a multi-user hosted service. Project JSON is stored
+under `~/.mustache/projects`. New saves preserve parameters, complete hierarchy
+results, HAI and meta-linkage, labels, representatives, selection and plot data.
+Older saves remain readable, with unavailable metadata and older shared
+reachability geometry identified honestly.
 
-- **Original MustaCHE Concept & Authors**:
-  Antonio Cavalcante Araujo Neto, Mario A. Nascimento, Joerg Sander, and Ricardo J. G. B. Campello (2018).
-- **Modernization, Core-SG Integration & Cython Backend**:
-  Maylon Martins de Melo (2025-2026), Federal University of São Carlos (UFSCar).
+## License and credits
+
+BSD 3-Clause; see [LICENSE](LICENSE). Original authors and scientific names retain
+their original spelling. Modernization and CORE-SG integration: Maylon Martins
+de Melo, supervised by Murilo Coelho Naldi, UFSCar (2025–2026).

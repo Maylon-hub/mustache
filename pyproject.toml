@@ -1,28 +1,47 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "mustache-core"
-version = "0.2.0"
+version = "0.3.0"
 description = "MustaCHE (Multiple Cluster Hierarchies Explorer) integrated with pre-compiled Core-SG"
 authors = [
-    {name = "MustaCHE Authors", email = "authors@example.com"}
+    {name = "Maylon Martins de Melo", email = "maylonmmartins@estudante.ufscar.br"},
 ]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.12"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
 dependencies = [
     "Flask>=3.0.0",
-    "core-sg-mustache>=0.3.0",
-    "numpy",
-    "pandas",
-    "scikit-learn",
-    "scipy",
-    "plotly"
+    # Private tree API: only this native hdbscan release is qualified for this RC.
+    "hdbscan==0.8.44",
+    "core-sg-mustache==0.4.5",
+    "numpy>=1.24,<3",
+    "pandas>=2.0",
+    "scikit-learn>=1.3",
+    "scipy>=1.10",
+    "plotly>=5.18"
 ]
 
 [project.scripts]
 mustache = "mustache.cli:main"
+
+[project.urls]
+Source = "https://github.com/Maylon-hub/mustache"
+Issues = "https://github.com/Maylon-hub/mustache/issues"
+Documentation = "https://maylon-hub.github.io/mustache/"
+Changelog = "https://github.com/Maylon-hub/mustache/blob/release/mustache-0.3.0/CHANGELOG.md"
 
 [tool.setuptools]
 include-package-data = true
@@ -34,16 +53,21 @@ exclude = ["tests*", "docs*", "scripts*", "legacy*"]
 [tool.setuptools.package-data]
 mustache = ["static/**/*", "templates/**/*"]
 
+[tool.setuptools.data-files]
+"share/doc/mustache-core" = ["CITATION.cff", "CHANGELOG.md", "AUTHORS.md", "AUTHORSHIP_APPROVAL_REQUIRED.md", "DATASETS.md", "RELEASE_NOTES.md"]
+
 [tool.setuptools.exclude-package-data]
-"*" = ["*.pdf", "*.png", "*.jpg", "*.bat", "*.sh"]
+mustache = ["*.pdf", "*.bat", "*.sh"]
+# Preserve packaged Web UI images.
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "pytest-flask>=1.2",
 ]
+release = ["build", "twine", "mkdocs-material>=9.6,<10", "pytest>=8", "pytest-cov"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_clustering.py", "test_batch.py", "test_hai.py", "test_api_routes.py"]
+python_files = ["test_*.py"]
 addopts = "-v --tb=short -p no:flask"

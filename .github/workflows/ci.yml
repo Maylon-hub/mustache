@@ -1,0 +1,100 @@
+name: RC validation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      core_sg_ref:
+        description: Companion CORE-SG ref; use an immutable commit SHA for final qualification
+        default: 7a8abb162c248f82d08247e2732fda3c7d8d690e
+        required: true
+permissions:
+  contents: read
+env:
+  CORE_SG_COMPANION_SHA: 7a8abb162c248f82d08247e2732fda3c7d8d690e
+jobs:
+  build:
+    name: Build common MustaCHE artifacts
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: x64
+      - run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          python -m twine check dist/*
+          python scripts/check_artifacts.py dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-mustache
+          path: dist/*
+          if-no-files-found: error
+  qualify:
+    name: Qualify ${{ matrix.os }} / CPython 3.11
+    needs: build
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Maylon-hub/core-sg
+          ref: ${{ inputs.core_sg_ref || env.CORE_SG_COMPANION_SHA }}
+          path: companion-core-sg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture: x64
+      - name: Verify the qualified immutable CORE-SG companion
+        shell: python
+        run: |
+          import os
+          import subprocess
+          actual = subprocess.check_output(
+              ['git', '-C', 'companion-core-sg', 'rev-parse', 'HEAD'], text=True
+          ).strip()
+          expected = os.environ['CORE_SG_COMPANION_SHA']
+          if actual != expected:
+              raise SystemExit(f'Unqualified CORE-SG companion: {actual}; expected {expected}')
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-mustache
+          path: dist
+      - name: Build the companion CORE-SG sdist and native wheel
+        run: |
+          python -m pip install --upgrade pip build twine cibuildwheel==3.3.1 "mkdocs-material>=9.6,<10"
+          git -C companion-core-sg rev-parse HEAD
+          python companion-core-sg/scripts/build_rc_artifacts.py companion-core-sg companion-dist
+          python -m twine check companion-dist/*
+          python companion-core-sg/scripts/check_artifacts.py companion-dist
+      - name: Qualify the SAME MustaCHE artifacts on each official platform
+        run: >-
+          python scripts/qualify_artifacts.py --project mustache
+          --artifacts dist --companion-artifacts companion-dist --companion-source companion-core-sg
+          --output "${{ runner.temp }}/mustache-qualification"
+      - name: Strict documentation
+        run: python -m mkdocs build --strict
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qualification-${{ runner.os }}-py3.11
+          path: |
+            ${{ runner.temp }}/mustache-qualification/*.log
+            ${{ runner.temp }}/mustache-qualification/*.xml
+            ${{ runner.temp }}/mustache-qualification/*-manual-browser/**
+          if-no-files-found: warn
+      - name: Upload machine-readable qualification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qualification-summary-${{ runner.os }}-py3.11
+          path: ${{ runner.temp }}/mustache-qualification/qualification.json
+          if-no-files-found: warn

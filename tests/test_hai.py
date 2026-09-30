@@ -128,6 +128,39 @@ class TestComputeHAIMatrix:
         H = compute_hai_matrix(linkage_list, X.shape[0])
         assert np.all((H >= 0 - 1e-10) & (H <= 1 + 1e-10))
 
+    def test_exact_condensed_matches_dense_definition(self, blobs_100):
+        X, _ = blobs_100
+        Z1 = linkage(pdist(X), method='single')
+        Z2 = linkage(pdist(X), method='complete')
+        dense_score = compute_hai_score(
+            build_distance_matrix(Z1, X.shape[0]),
+            build_distance_matrix(Z2, X.shape[0]),
+        )
+        matrix, metadata = compute_hai_matrix(
+            [Z1, Z2], X.shape[0], return_metadata=True
+        )
+        assert matrix[0, 1] == pytest.approx(dense_score, abs=1e-7)
+        assert metadata['method'] == 'exact-condensed'
+        assert metadata['approximate'] is False
+
+    def test_sampled_hai_is_deterministic_and_auditable(self, blobs_100):
+        X, _ = blobs_100
+        Z1 = linkage(pdist(X), method='single')
+        Z2 = linkage(pdist(X), method='complete')
+        kwargs = dict(
+            max_exact_samples=10,
+            sample_pairs=5000,
+            random_state=7,
+            return_metadata=True,
+        )
+        first, metadata = compute_hai_matrix([Z1, Z2], X.shape[0], **kwargs)
+        second, _ = compute_hai_matrix([Z1, Z2], X.shape[0], **kwargs)
+        np.testing.assert_array_equal(first, second)
+        assert metadata['method'] == 'sampled-pairs'
+        assert metadata['approximate'] is True
+        assert metadata['pair_count'] == 5000
+        assert metadata['absolute_error_bound'] > 0
+
 
 class TestComputeMedoids:
     def test_medoid_per_cluster(self):

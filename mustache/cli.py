@@ -1,11 +1,21 @@
 import sys
 import time
 import argparse
+from importlib.metadata import version, PackageNotFoundError
+
+
+def supports_blocks():
+    """Piped Windows terminals may use cp1252, unlike an interactive UTF-8 console."""
+    try:
+        '█░'.encode(sys.stdout.encoding or 'ascii')
+        return True
+    except UnicodeEncodeError:
+        return False
 
 def print_progress(step_name, percentage, start_time=None):
     width = 30
     filled = int(width * percentage / 100)
-    bar = "█" * filled + "░" * (width - filled)
+    bar = ("█" * filled + "░" * (width - filled)) if supports_blocks() else ("#" * filled + "-" * (width - filled))
     
     elapsed_str = ""
     if start_time is not None:
@@ -24,15 +34,15 @@ def main():
     
     args = parser.parse_args()
     
-    print("\n\033[32m")
-    print("                            ████          ████")
-    print("                        ████████████  ████████████")
-    print("                      ██████████████████████████████")
-    print("              ██    ██████████████████████████████████    ██")
-    print("              ██████████████████████  ██████████████████████")
-    print("                ██████████████████      ██████████████████")
-    print("                    ██████████              ██████████\033[0m")
-    print("                     MustaCHE Explorer v2.0")
+    if supports_blocks():
+        print("\n                            ████          ████")
+        print("                        ████████████  ████████████")
+        print("                      ██████████████████████████████")
+    try:
+        package_version = version('mustache-core')
+    except PackageNotFoundError:
+        package_version = 'development'
+    print(f"                     MustaCHE Explorer ({package_version})")
     print("                     ======================\n")
 
     start_time = time.time()
@@ -54,11 +64,10 @@ def main():
     import sklearn
     time.sleep(0.15)
 
-    print_progress("Loading Clustering Engine (core-sg)...", 90, start_time)
-    try:
-        import core_sg
-    except ImportError:
-        pass
+    # Core-SG is imported lazily only when the user selects that algorithm.
+    # Importing it during CLI startup can trigger costly native/Numba initialization
+    # even when the user only wants HDBSCAN or the documentation pages.
+    print_progress("Registering lazy clustering backends...", 90, start_time)
     time.sleep(0.1)
 
     print_progress("Initializing application routes...", 98, start_time)

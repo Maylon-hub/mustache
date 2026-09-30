@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MustaCHE v2</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/LOGO.png') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/Mustache_Logo_SVG.svg') }}">
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=20260928-manual-selection">
     <!-- Bootstrap CSS for Grid/Modals (using CDN for simplicity in replication) -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
@@ -29,28 +29,38 @@
                 <!-- Main Section -->
                 <div class="sidebar-section-title">Main</div>
                 <ul>
-                    <li><a href="#" onclick="openBatchConfigModal(); return false;"><i class="fas fa-chart-pie"></i>
+                    <li><a href="/datasets"><i class="fas fa-chart-pie"></i>
                             Datasets</a></li>
-                    ed <li><a href="/projects"><i class="fas fa-folder-open"></i> Projects &amp; History</a></li>
-                    <li><a href="#" onclick="return false;"><i class="fas fa-cog"></i> Global Settings</a></li>
+                    <li><a href="/projects"><i class="fas fa-folder-open"></i> Projects &amp; History</a></li>
+                    <li><a href="/settings"><i class="fas fa-cog"></i> Global Settings</a></li>
                 </ul>
 
                 <!-- Panels Section -->
                 <div class="sidebar-section-title">Panels</div>
                 <ul>
-                    <li><a href="#"><i class="fas fa-sitemap"></i> Dendrogram</a></li>
-                    <li><a href="#"><i class="fas fa-th"></i> HAI Plot</a></li>
-                    <li><a href="#"><i class="fas fa-chart-area"></i> Reachability</a></li>
+                    <li><a href="{{ '' if request.path == '/' else '/' }}#meta-dendrogram"><i class="fas fa-sitemap"></i> Meta-Hierarchy Dendrogram</a></li>
+                    <li><a href="{{ '' if request.path == '/' else '/' }}#hai-heatmap"><i class="fas fa-th"></i> HAI Similarity Matrix</a></li>
+                    <li><a href="{{ '' if request.path == '/' else '/' }}#reachability-container"><i class="fas fa-chart-area"></i> Reachability Plots</a></li>
                 </ul>
             </div>
 
             <div class="project-info-panel">
                 <div class="sidebar-section-title" style="padding:0; margin-bottom:10px;">Project</div>
-                <div class="label">Name:</div>
+                <div class="label">Project name:</div>
                 <div class="value" id="proj-name">Unknown</div>
-                <div class="label">Min mpts:</div>
+                <div class="label">Algorithm:</div>
+                <div class="value" id="proj-algorithm">-</div>
+                <div class="label">Minimum mpts:</div>
                 <div class="value" id="proj-min-mpts">-</div>
-                <div class="label">Time:</div>
+                <div class="label">Maximum mpts:</div>
+                <div class="value" id="proj-max-mpts">-</div>
+                <div class="label">Step size:</div>
+                <div class="value" id="proj-step">-</div>
+                <div class="label">Distance metric:</div>
+                <div class="value" id="proj-metric">-</div>
+                <div class="label">Number of points:</div>
+                <div class="value" id="proj-points">-</div>
+                <div class="label">Execution time:</div>
                 <div class="value" id="proj-time">-</div>
                 <button id="btn-sidebar-save" class="btn btn-sm btn-outline-success w-100 mt-2"
                     style="display:none; font-size:0.75rem;" onclick="openSaveProjectModal()">
@@ -73,7 +83,7 @@
                         title="James Cook University" style="max-width: 100%; max-height: 25px; object-fit: contain;">
                 </div>
                 <div class="copyright" style="font-size:0.7rem; margin-top:5px; text-align:center;">&copy; 2017 The
-                    Develovers</div>
+                    Developers</div>
             </div>
         </div>
 
@@ -86,20 +96,20 @@
                     <!-- Nav Logo -->
                     <i class="fas fa-bars"
                         style="font-size: 1.2rem; color: #95a5a6; margin-right: 15px; cursor: pointer;"></i>
-                    <img src="{{ url_for('static', filename='img/LOGO.png') }}" alt="MustaCHE Logo"
+                    <img src="{{ url_for('static', filename='img/Mustache_Logo_SVG.svg') }}" alt="MustaCHE Logo"
                         style="height: 35px;">
                 </div>
                 <div class="navbar-right d-flex align-items-center">
-                    <div class="input-group input-group-sm" style="width: 250px; margin-right: 15px;">
-                        <input type="text" class="form-control" placeholder="Search datasets...">
+                    <form action="/datasets" method="get" class="input-group input-group-sm" style="width: 250px; margin-right: 15px;">
+                        <input type="search" name="q" class="form-control" placeholder="Search datasets..." aria-label="Search datasets">
                         <div class="input-group-append">
-                            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                            <button type="submit" class="input-group-text bg-white" aria-label="Search"><i class="fas fa-search text-muted"></i></button>
                         </div>
-                    </div>
+                    </form>
                     <a href="/projects" title="Projects &amp; History"
                         style="color: #95a5a6; font-size: 1.2rem; margin-right: 15px;"><i
                             class="fas fa-folder-open"></i></a>
-                    <a href="#" title="Settings" style="color: #95a5a6; font-size: 1.2rem; margin-right: 15px;"><i
+                    <a href="/settings" title="Settings" style="color: #95a5a6; font-size: 1.2rem; margin-right: 15px;"><i
                             class="fas fa-cog"></i></a>
                     <a href="#" title="About" onclick="openAboutModal(); return false;"
                         style="color: #95a5a6; font-size: 1.2rem;"><i class="fas fa-info-circle"></i></a>
@@ -121,11 +131,12 @@
             <p><strong>MustaCHE</strong> (Multiple Cluster Hierarchies Explorer) is a tool for analyzing hierarchical
                 density-based clustering results.</p>
             <h3>Version Information</h3>
-            <p>Version: 2.0 (Rebuilt)</p>
-            <p>Technology Stack: Flask + Python 3.11 + scikit-learn + Plotly.js</p>
+            <p>Package version: {{ mustache_version }}</p>
+            <p>Main engine: CORE-SG. Auxiliary comparison baseline: HDBSCAN.</p>
+            <p>Technology stack: Flask, Python, CORE-SG, HDBSCAN, scikit-learn and Plotly.js</p>
             <h3>Credits</h3>
-            <p>Origin: Antonio Cavalcante et al. (2017)</p>
-            <p>Rebuilt: Maylon Martins de Melo (2025)</p>
+            <p>Origin: Antonio Cavalcante Araujo Neto et al. (2018)</p>
+            <p>Modernization: Maylon Martins de Melo (2025–2026)</p>
         </div>
     </div>
 
@@ -135,7 +146,7 @@
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=2.0.2"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=20260928-manual-selection"></script>
 
     <script>
         // Modal Logic
@@ -151,7 +162,7 @@
             if (document.getElementById('configModal')) {
                 $('#configModal').modal('show');
             } else {
-                alert("Configuration is available on the Dashboard page.");
+                alert("Open the explorer to configure a batch analysis.");
             }
         }
 

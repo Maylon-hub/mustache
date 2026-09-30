@@ -1,12 +1,18 @@
+# Environments
+.venv/
+.venv*/
+venv/
+venv_*/
+ENV/
+env/
+*.venv
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
 build/
 develop-eggs/
 dist/
@@ -33,6 +39,7 @@ instance/
 # IDE
 .vscode/
 .idea/
+.agent/
 *.swp
 *.swo
 *~
@@ -58,6 +65,12 @@ workspace/
 *.tmp
 temp/
 tmp/
+.mkdocs-check/
+/site/
+
+# Keep release-only research drafts and ad-hoc scripts out of the canonical tree.
+/scratch/
+/docs/pibic/
 
 # OS
 Thumbs.db

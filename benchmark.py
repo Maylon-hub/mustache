@@ -9,11 +9,11 @@ SIZES = [1000, 10000, 50000, 100000]
 DIMENSIONS = [2, 10, 50]
 RESULTS = []
 
-print("Iniciando Benchmarks...")
+print("Starting baseline benchmarks...")
 
 for n in SIZES:
     for d in DIMENSIONS:
-        print(f"Testando N={n}, D={d}...")
+        print(f"Testing N={n}, D={d}...")
         
         # Gerar dados
         X, y = make_blobs(n_samples=n, n_features=d, centers=5, random_state=42)
@@ -43,4 +43,4 @@ for n in SIZES:
 # Salvar
 df = pd.DataFrame(RESULTS)
 df.to_csv('benchmark_results_baseline.csv', index=False)
-print("Resultados salvos!")
+print("Results saved!")
