@@ -9,7 +9,6 @@ other Python versions are not qualified for this release.
 
 ```powershell
 py -3.11 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install --extra-index-url https://test.pypi.org/simple/ mustache-core==0.3.0
 .\.venv\Scripts\python.exe -m pip check
 .\.venv\Scripts\mustache.exe
@@ -19,7 +18,6 @@ py -3.11 -m venv .venv
 
 ```bash
 python3.11 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install --extra-index-url https://test.pypi.org/simple/ mustache-core==0.3.0
 .venv/bin/python -m pip check
 .venv/bin/mustache
