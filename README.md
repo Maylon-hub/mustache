@@ -39,7 +39,6 @@ TestPyPI (PowerShell):
 
 ```powershell
 py -3.11 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install --extra-index-url https://test.pypi.org/simple/ mustache-core==0.3.0
 .\.venv\Scripts\python.exe -m pip check
 .\.venv\Scripts\mustache.exe

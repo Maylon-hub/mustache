@@ -10,6 +10,12 @@
   --md-default-bg-color--light: #17394a;
   --md-default-fg-color: #f5f8f8;
   --md-accent-fg-color: #4ade80;
+  --md-typeset-a-color: #7de2b1;
+}
+
+[data-md-color-scheme="slate"] .md-typeset .md-button:not(.md-button--primary) {
+  color: #7de2b1;
+  border-color: #7de2b1;
 }
 
 .lead {
