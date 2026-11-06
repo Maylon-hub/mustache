@@ -62,8 +62,10 @@ it has host, port and debug options, not batch-processing subcommands.
    synthetic datasets, or upload a CSV with numeric features.
 2. Keep the default **CORE-SG** engine, or choose **HDBSCAN (comparison baseline)**.
    Set **Minimum mpts**, **Maximum mpts**, **Step size** and
-   **Distance metric**. Specify whether the CSV has a header when automatic
-   detection is ambiguous.
+   **Distance metric** and **Minimum cluster size**. Automatic cluster size
+   keeps the previous `minimum cluster size = mpts` behavior; an explicit size
+   stays fixed across the sweep. Specify whether the CSV has a header when
+   automatic detection is ambiguous.
 3. Inspect the **HAI Similarity Matrix** and **Meta-Hierarchy Dendrogram**.
    The matrix uses increasing `mpts` order; dendrogram leaves may be reordered.
 4. Use automatic meta-clustering or select a distance threshold. Clicking a
@@ -72,14 +74,17 @@ it has host, port and debug options, not batch-processing subcommands.
    non-overlapping branches form additional groups; overlapping selections
    replace earlier groups.
 5. Inspect **Reachability Plots** for representatives and separately identified
-   meta-clustering outliers. Use the hierarchy inspector for any other `mpts`,
-   with zoom and flat-cluster colors; point labels are local to that hierarchy.
+   meta-clustering outliers. The **Hierarchy Explorer** opens any generated
+   `mpts` and shows its own reachability plot, condensed group tree, group
+   membership and the trajectory of an original input row. Noise is gray;
+   flat-cluster labels are local to each hierarchy.
 6. **Save Analysis**, then reopen it from **Projects & History** without rerunning
    clustering. **Export CSV** exports selected hierarchies, or active
    representatives when there is no manual selection.
 
-In batch mode, `mpts` controls both the density-neighborhood parameter and minimum
-cluster size; the legacy application exposed minimum cluster size separately.
+In batch mode, `mpts` remains the density-neighborhood (`min_samples`) parameter.
+The optional minimum cluster size can be controlled independently. Old saved
+analyses without this setting retain the automatic per-`mpts` interpretation.
 The maximum bound is inclusive when reached by the selected step; for example
 2..8 with step 2 yields 2, 4, 6, 8. Require
 `2 <= min_mpts <= max_mpts < n_samples` and a positive step.

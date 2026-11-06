@@ -81,8 +81,11 @@ subtrees and updates their medoids immediately. A new ancestor/descendant
 selection replaces overlapping selected groups. Unselected hierarchies are not
 automatic outliers. Selected descendants are also saved and exported. This does
 not select clusters of dataset points. Full legacy FOSC controls are not exposed.
-Inspect any hierarchy opens a zoomable detailed plot with flat-cluster colors,
-black for noise, and hover sample indices, including non-medoids and outliers.
+The Hierarchy Explorer opens any generated hierarchy, including non-medoids and
+meta-clustering outliers. It shows that hierarchy's reachability, condensed
+group tree and input-row point trajectories. Flat-cluster colors are stable
+within a hierarchy; noise is gray and remains label −1. The chart reports
+cluster and noise counts.
 Cluster colors do not imply corresponding clusters across different mpts.
 
 ## Reachability Plots
@@ -115,9 +118,16 @@ the requested minimum cluster size.
 `range(min_mpts, max_mpts + 1, step)`. The maximum is a configured bound, not
 necessarily an evaluated value when the step does not land on it. Require at
 least three samples, `2 <= min_mpts <= max_mpts < n_samples`, and step >= 1.
-In batch mode minimum cluster size and density `mpts` are both set to each
-sweep value. The legacy form exposed minimum cluster size independently; this
-modern coupling can change flat partitions and is not legacy parameter parity.
+In **automatic** mode, minimum cluster size equals each hierarchy's `mpts`;
+this is the behavior of saved analyses created before the explorer. In
+**explicit** mode, one minimum cluster size is held fixed across the sweep,
+while `min_samples` remains equal to each `mpts`. The explicit value must be
+between 2 and the dataset size. The public HDBSCAN minimum size follows its
+`match_reference_implementation=True` convention: version 0.8.44 increments
+that value internally before condensing the tree. The effective condensation
+threshold is recorded in each new hierarchy result. Changing the mode can
+change flat labels and the group tree, while the CORE-SG support is still built
+only once at `k_max`.
 Small settings show fine structure and noise; large settings
 emphasize denser, coarser structures. Explore a small sweep before a large one.
 
@@ -134,6 +144,35 @@ with seed 42; it does not define any clustering result. A failed projection
 falls back to feature coordinates and is labeled accordingly. No UMAP is
 implemented.
 
+## Explore one hierarchy and one input row
+
+After a batch, use **Hierarchy (mpts)** in the Hierarchy Explorer to inspect
+any fitted tree. Its reachability bars are ordered by that tree's leaves;
+hover shows the original zero-based input row position. That row position is
+not the leaf position and is never a condensed-tree group ID. Click a bar or
+enter a row position under **Point trajectory** to trace the point from the
+root through descendant groups to its singleton departure. The trajectory
+shows group sizes at birth and the lambda values at which it leaves each
+group. Its final flat label is reported separately: a singleton departure does
+not by itself mean the flat partition labels the point as noise.
+
+The **Group tree** is built from the condensed tree returned by the same
+HDBSCAN tree-selection call used for the fitted linkage's labels, without a
+second clustering fit. This is a cluster-only layout: horizontal position is
+`lambda = 1 / separation distance`, while vertical position only spreads
+branches for reading. Marker size and branch width help show group size;
+diamonds aggregate points leaving a group. Descendants smaller than the
+minimum cluster size appear as point departures instead of independent group
+nodes. Click a round group marker to highlight all input rows descending from
+that group at its birth. The group detail also reports the distribution of
+final flat labels among those rows.
+
+For CORE-SG, the condensed tree is derived from its already extracted
+single-linkage hierarchy through the pinned HDBSCAN 0.8.44 tree-processing
+adapter. This is not claimed to equal a separately fitted HDBSCAN hierarchy.
+The legacy MustaCHE interval hierarchy, modern full single linkage and this
+condensed view are related but not identical representations.
+
 **CSV:** numeric features only; labels are not automatically excluded from a
 numeric column. For the single-analysis API, provide reference labels separately
 as `labels_file` for ARI and AMI. Numeric CSV headers can look like data: select
@@ -145,13 +184,17 @@ return an error.
 Save Analysis records a name, dataset name, sample count, algorithm, metric,
 minimum/maximum `mpts`, step, observed time and timestamp. The result payload
 contains HAI and its metadata, meta-linkage, active labels/medoids/outliers,
-automatic partition, threshold, manual selection and every hierarchy's labels,
-probabilities and geometry.
+automatic partition, threshold, manual meta-selection and every hierarchy's
+labels, probabilities, condensed-tree rows, group summary and geometry. New
+projects also record the minimum-cluster-size mode, explicit size when used,
+and the explorer's selected hierarchy, group and input row.
 
 Projects & History reopens the saved data without clustering again. The sidebar
 and all coordinated views restore the active parameters and selection.
 Older project aliases are supported; missing parameters are inferred only where
-possible, and unavailable values are displayed as missing. Export CSV uses
+possible, and unavailable values are displayed as missing. Older projects
+without condensed-tree rows remain viewable but need a new analysis before
+their groups or point trajectories can be inspected. Export CSV uses
 manually selected hierarchies, otherwise active representatives. Export ZIP
 includes metadata, results and the saved dataset.
 
