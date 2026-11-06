@@ -8,6 +8,7 @@ from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score, pai
 from sklearn.neighbors import NearestNeighbors
 
 from .validation import numeric_data, validate_metric
+from .group_tree import serialize_condensed_tree, group_tree_summary
 
 
 def compute_mutual_reachability(data, min_samples, metric='euclidean'):
@@ -90,11 +91,8 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         # CORE-SG's cached k_max outputs and extraction defaults use different
         # minimum cluster sizes. Relabel the SAME tree explicitly for this mpts.
         # This is the narrow tested HDBSCAN adapter boundary (not another fit).
-        from hdbscan.hdbscan_ import _tree_to_labels
-        labels, probabilities = _tree_to_labels(
-            data, Z, min_cluster_size=minimum_size + 1,
-            match_reference_implementation=True,
-        )[:2]
+        from .hdbscan_adapter import label_core_sg_linkage
+        labels, probabilities, condensed = label_core_sg_linkage(data, Z, minimum_size)
     else:
         import hdbscan
         kwargs = {'p': 2} if metric == 'minkowski' else {}
@@ -105,10 +103,13 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
             approx_min_span_tree=False, **kwargs,
         ).fit(data)
         labels, probabilities = model.labels_, model.probabilities_
+        condensed = model.condensed_tree_.to_numpy()
         # Use the fitted tree, not an independently reconstructed MRD hierarchy.
         Z = model.single_linkage_tree_.to_numpy().astype(float)
     elapsed = time.perf_counter() - start + extra_clustering_time
     labels, probabilities = np.asarray(labels), np.asarray(probabilities)
+    condensed_rows = serialize_condensed_tree(condensed)
+    group_tree = group_tree_summary(condensed_rows, len(data), minimum_size)
     start = time.perf_counter()
     reach = hierarchy_reachability(Z, labels, mpts=mpts, metric=metric)
     reach_time = time.perf_counter() - start
@@ -153,5 +154,8 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
         'optics_time': 0.0, 'reachability_time': reach_time,
         'clustering_time': elapsed, 'algorithm': algorithm, 'metric': metric,
         'mpts': mpts, 'min_cluster_size': minimum_size, 'n_samples': len(data),
+        'min_samples': mpts, 'condensation_threshold': minimum_size + 1,
+        'condensed_tree': condensed_rows,
+        'group_tree': group_tree,
         'hierarchy_representation': 'full-single-linkage',
     }

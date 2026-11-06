@@ -24,7 +24,8 @@ def _package_version(distribution: str) -> str:
 def runtime_provenance():
     """Distribution versions alone do not identify an edited source checkout."""
     sources = {}
-    for name in ('hai.py', 'clustering.py', 'batch.py'):
+    for name in ('hai.py', 'clustering.py', 'batch.py', 'group_tree.py',
+                 'hdbscan_adapter.py'):
         source = Path(__file__).parent / name
         sources[f'mustache/core/{name}'] = hashlib.sha256(source.read_bytes()).hexdigest()
     spec = importlib.util.find_spec('core_sg')
@@ -119,6 +120,8 @@ def save_project(name: str, params: dict, analysis: dict, results: dict, raw_df:
         "mpts_min": params.get("min_mpts", 2),
         "mpts_max": params.get("max_mpts", 10),
         "step": params.get("step", 1),
+        "min_cluster_size_mode": params.get("min_cluster_size_mode", "automatic"),
+        "min_cluster_size": params.get("min_cluster_size"),
         "mustache_version": _package_version("mustache-core"),
         "core_sg_version": _package_version("core-sg-mustache"),
         "status": "COMPLETED"

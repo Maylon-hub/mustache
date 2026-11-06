@@ -96,7 +96,7 @@
             <div class="card-body p-0">
                 <!-- We will append multiple reachability plots here side-by-side -->
                 <p class="small text-muted px-3 pt-2 mb-1">Representative hierarchy (medoid): the mpts minimizing the sum of 1 − HAI within each meta-cluster. Automatic meta-clustering outliers are shown separately.</p>
-                <div class="px-3 pb-2 d-flex align-items-center"><label for="inspect-mpts" class="small mb-0 mr-2">Inspect any hierarchy:</label><select id="inspect-mpts" class="form-control form-control-sm mr-2" style="width:auto;" aria-label="Hierarchy mpts"></select><button type="button" id="inspect-hierarchy" class="btn btn-sm btn-outline-secondary">Open detailed plot</button></div>
+                <p class="small text-muted px-3 pb-2 mb-0">Choose any mpts in the Hierarchy Explorer below for its group tree and point trajectories.</p>
                 <div id="reachability-container" class="d-flex" style="overflow-x: auto; height: 420px;">
                     <!-- JS will populate individual reachability plots -->
                     <div class="text-muted p-3">Run Batch Analysis to generate meta-clusters.</div>
@@ -104,6 +104,31 @@
             </div>
         </div>
     </div>
+    <section class="pane card hierarchy-explorer" id="hierarchy-explorer" aria-label="Individual hierarchy explorer">
+        <div class="card-header d-flex align-items-center flex-wrap">
+            <strong class="mr-3"><i class="fas fa-project-diagram mr-1"></i> Hierarchy Explorer</strong>
+            <label for="inspect-mpts" class="small mb-0 mr-2">Hierarchy (mpts)</label>
+            <select id="inspect-mpts" class="form-control form-control-sm mr-2" style="width:auto;" aria-label="Hierarchy mpts"></select>
+            <button type="button" id="inspect-hierarchy" class="btn btn-sm btn-outline-secondary">Inspect hierarchy</button>
+            <span id="explorer-status" class="small text-muted ml-3" role="status">Run a batch to inspect an individual hierarchy.</span>
+        </div>
+        <div class="card-body">
+            <div id="explorer-params" class="small mb-3" aria-live="polite"></div>
+            <p class="small text-muted">The reachability view uses adjacent merge heights in this hierarchy, not an OPTICS ordering. Group-tree horizontal position is <strong>lambda</strong> (inverse separation distance), not distance. Cluster IDs are internal tree IDs; point IDs are zero-based input row indices. Branches below the minimum cluster size appear as point departures rather than separate groups.</p>
+            <div class="explorer-plots">
+                <div><h6>Reachability Plot <small id="explorer-reach-stats" class="text-muted"></small></h6><div id="hierarchy-detail-plot" class="explorer-plot"></div></div>
+                <div><h6>Group tree (condensed hierarchy)</h6><div id="group-tree-plot" class="explorer-plot"></div></div>
+            </div>
+            <div class="explorer-details">
+                <div><h6>Selected group</h6><div id="group-detail" class="small text-muted">Click a group marker in the tree.</div></div>
+                <div>
+                    <h6>Point trajectory</h6>
+                    <div class="d-flex align-items-center flex-wrap mb-2"><label for="point-id" class="small mb-0 mr-2">Input row index</label><input id="point-id" type="number" min="0" step="1" class="form-control form-control-sm mr-2" style="width:110px;"><button id="inspect-point" type="button" class="btn btn-sm btn-outline-secondary">Trace point</button></div>
+                    <div id="point-trajectory" class="small text-muted">Enter an input row index or click a reachability bar.</div>
+                </div>
+            </div>
+        </div>
+    </section>
 </div>
 
 <!-- Configuration Modal for Batch -->
@@ -175,6 +200,15 @@
                             {% for metric in supported_metrics['core-sg'] %}<option value="{{ metric }}">{{ metric }}{% if metric == 'minkowski' %} (p = 2){% endif %}</option>{% endfor %}
                         </select>
                         <small class="form-text text-muted">Applied to clustering and hierarchy distances. Cosine requires non-zero vectors. Minkowski uses p = 2.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="batch-size-mode">Minimum cluster size</label>
+                        <select id="batch-size-mode" class="form-control" name="min_cluster_size_mode">
+                            <option value="automatic">Automatic — same as mpts for each hierarchy (previous behavior)</option>
+                            <option value="explicit">One explicit value for every hierarchy</option>
+                        </select>
+                        <input id="batch-min-cluster-size" type="number" class="form-control mt-2" name="min_cluster_size" min="2" placeholder="Enter at least 2" disabled>
+                        <small class="form-text text-muted">mpts remains the minimum-samples parameter. Minimum cluster size controls condensation and flat-cluster extraction independently.</small>
                     </div>
                     <div class="text-right mt-3">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>

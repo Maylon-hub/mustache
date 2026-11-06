@@ -5,7 +5,7 @@ import time
 from .clustering import run_clustering
 from .validation import numeric_data, validate_metric, validate_range
 
-def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algorithm='core-sg'):
+def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algorithm='core-sg', min_cluster_size=None):
     """
     Build each requested hierarchy, reusing CORE-SG support once per batch.
     Returns a dictionary where keys are mpts values and values are clustering results.
@@ -16,6 +16,10 @@ def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algor
     validate_metric(algorithm, metric)
     data_np = numeric_data(df, metric)
     validate_range(min_mpts, max_mpts, step, len(data_np))
+    if min_cluster_size is not None:
+        if isinstance(min_cluster_size, bool) or int(min_cluster_size) != min_cluster_size or not 2 <= int(min_cluster_size) <= len(data_np):
+            raise ValueError(f'Minimum cluster size must be between 2 and {len(data_np)} samples.')
+        min_cluster_size = int(min_cluster_size)
     
     n_iters = max(1, len(range(min_mpts, max_mpts + 1, step)))
 
@@ -32,14 +36,13 @@ def run_batch_clustering(df, min_mpts, max_mpts, step, metric='euclidean', algor
 
     # Loop through mpts range
     for mpts in range(min_mpts, max_mpts + 1, step):
-        # Modern batch policy ties minimum cluster size to the density mpts.
-        # The legacy form exposed these independently; see the scientific guide.
+        # Automatic mode preserves the previous per-hierarchy policy.
         
         # Run clustering for this specific mpts
         try:
             cluster_result = run_clustering(
                 df, 
-                min_cluster_size=mpts, 
+                min_cluster_size=mpts if min_cluster_size is None else min_cluster_size,
                 min_samples=mpts, 
                 metric=metric, 
                 algorithm=algorithm,

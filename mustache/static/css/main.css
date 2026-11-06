@@ -215,6 +215,12 @@ body {
     border-right: 1px dashed #ddd;
 }
 
+.hierarchy-explorer { flex: 0 0 auto; }
+.explorer-plots, .explorer-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.explorer-plot { width: 100%; height: 460px; min-height: 460px; }
+.explorer-details { margin-top: 15px; }
+#group-tree-plot .scatterlayer .trace:last-child .points path { cursor: pointer; }
+
 @media (max-width: 800px) {
     .sidebar { display: none; }
     .main { min-width: 0; }
@@ -223,5 +229,6 @@ body {
     .pane-bottom-left, .pane-bottom-right { flex: auto; width: 100%; }
     .mustache-layout { height: auto; }
     .pane-top { flex-basis: auto; }
+    .explorer-plots, .explorer-details { grid-template-columns: 1fr; }
     .card-header { gap: 8px; flex-wrap: wrap; }
 }

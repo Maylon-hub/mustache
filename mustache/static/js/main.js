@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let pendingCut = Promise.resolve();
     let representativeSignature = '';
     const form = document.getElementById('batch-form');
+    const hierarchyExplorer = new window.HierarchyExplorer();
     const modeSelect = document.getElementById('meta-selection-mode');
     const scaleSelect = document.getElementById('hai-scale-mode');
     const settingsKey = 'mustache.settings.v1';
@@ -37,6 +38,13 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         form.elements.algorithm.addEventListener('change', updateMetrics);
         updateMetrics();
+        const updateSizeMode = () => {
+            const explicit = form.elements.min_cluster_size_mode.value === 'explicit';
+            form.elements.min_cluster_size.disabled = !explicit;
+            form.elements.min_cluster_size.required = explicit;
+        };
+        form.elements.min_cluster_size_mode.addEventListener('change', updateSizeMode);
+        updateSizeMode();
     }
     const sidebar = document.querySelector('.sidebar');
     document.querySelector('.fa-bars')?.addEventListener('click', () => {
@@ -49,6 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
             'proj-algorithm': params.algorithm === 'core-sg' ? 'CORE-SG' : (params.algorithm === 'hdbscan' ? 'HDBSCAN' : null),
             'proj-min-mpts': params.min_mpts, 'proj-max-mpts': params.max_mpts,
             'proj-step': params.step, 'proj-metric': params.metric,
+            'proj-min-cluster-size': params.min_cluster_size_mode === 'explicit'
+                ? params.min_cluster_size : 'Automatic (= mpts)',
             'proj-points': params.n_samples ?? metadata.points,
             'proj-time': params.execution_time == null ? null : Number(params.execution_time).toFixed(2) + ' s'
         };
@@ -58,8 +68,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         if (form) Object.entries(params).forEach(([key, value]) => {
             const field = form.elements.namedItem(key);
-            if (field && field.type !== 'file') field.value = value;
+            if (field && field.type !== 'file') field.value = value ?? '';
         });
+        if (form) {
+            const explicit = params.min_cluster_size_mode === 'explicit';
+            form.elements.min_cluster_size_mode.value = explicit ? 'explicit' : 'automatic';
+            form.elements.min_cluster_size.disabled = !explicit;
+            form.elements.min_cluster_size.required = explicit;
+        }
         ['btn-save-top', 'btn-sidebar-save'].forEach(id => {
             const button = document.getElementById(id);
             if (button) button.style.display = results ? 'inline-block' : 'none';
@@ -308,18 +324,29 @@ document.addEventListener('DOMContentLoaded', () => {
             heading.title = outlier ? 'No automatic meta-cluster contains this hierarchy; it is not a medoid.' : `Meta-cluster ${group}: minimizes the sum of 1 − HAI to other hierarchies in this group.`;
             const note = document.createElement('div'); note.className = 'small text-muted px-3';
             const reach = result.reachability_data;
-            note.textContent = reach?.method === 'hierarchy-adjacent-cophenetic' ? `${outlier ? 'Outlier hierarchy' : 'Meta-cluster ' + group} · distances from this hierarchy` : 'Older saved layout: geometry may be shared across mpts.';
+            note.textContent = reach?.method === 'hierarchy-adjacent-cophenetic'
+                ? `${outlier ? 'Meta-clustering outlier' : 'Meta-cluster ' + group} · ${result.n_clusters} flat clusters · ${result.noise_points}/${result.n_samples} sample noise · distances from this hierarchy`
+                : 'Older saved layout: geometry may be shared across mpts.';
+            if (result.n_clusters === 0) note.textContent += ' · No valid flat clusters at this minimum cluster size.';
             const chart = document.createElement('div'); chart.style.height = '345px';
             wrapper.append(heading, note, chart); container.append(wrapper);
             const inspect = document.createElement('button');
             inspect.className = 'btn btn-sm btn-link px-3'; inspect.textContent = 'Inspect hierarchy';
-            inspect.addEventListener('click', () => inspectHierarchy(mpts));
+            inspect.addEventListener('click', () => hierarchyExplorer.open(mpts, { scroll: true }));
             wrapper.insertBefore(inspect, chart);
             const figure = reach ? {
-                data: [{ type: 'bar', x: reach.x, y: reach.y, customdata: reach.x.map((_, j) => [reach.ordering?.[j] ?? j, reach.labels[j]]), hovertemplate: 'Sample %{customdata[0]}<br>Hierarchy distance: %{y:.6f}<br>Cluster: %{customdata[1]}<extra></extra>' }],
-                layout: { template: 'plotly_white', xaxis: { title: 'Sample order' }, yaxis: { title: 'Hierarchy reachability distance', rangemode: 'tozero' } }
+                data: [...new Set(reach.labels.map(Number))].sort((a, b) => a - b).map(label => {
+                    const positions = reach.labels.map((value, j) => Number(value) === label ? j : -1).filter(j => j >= 0);
+                    return { type: 'bar', name: label === -1 ? 'Noise' : `Cluster ${label}`,
+                        x: positions.map(j => reach.x[j]), y: positions.map(j => reach.y[j]),
+                        customdata: positions.map(j => [reach.ordering?.[j] ?? j, label]),
+                        marker: { color: window.mustacheClusterColor(label) },
+                        hovertemplate: 'Input row %{customdata[0]}<br>Hierarchy distance: %{y:.6f}<br>Flat label: %{customdata[1]}<extra></extra>' };
+                }),
+                layout: { template: 'plotly_white', barmode: 'overlay', bargap: 0,
+                    legend: { orientation: 'h' }, xaxis: { title: 'Leaf order' },
+                    yaxis: { title: 'Hierarchy reachability distance', rangemode: 'tozero' } }
             } : JSON.parse(result.reachability_json);
-            figure.data.forEach(trace => { trace.marker = { color: outlier ? '#8D8D88' : '#1F6F5F' }; });
             Object.assign(figure.layout, { title: '', annotations: [], font: { size: 12 }, margin: { t: 10, r: 15, l: 65, b: 55 } });
             Plotly.newPlot(chart, figure.data, figure.layout, { responsive: true, displayModeBar: false });
         });
@@ -327,10 +354,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function renderAnalysis() {
-        const select = document.getElementById('inspect-mpts');
-        if (select) select.replaceChildren(...analysis.ordered_mpts.map(mpts => new Option(`mpts = ${mpts}`, mpts)));
         updateProjectInfo(); refreshSelection();
         await renderDendrogram(); renderHAI(); renderReachability();
+        await hierarchyExplorer.setData(analysis, results, params);
     }
     if (form) form.addEventListener('submit', async event => {
         event.preventDefault();
@@ -367,42 +393,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Capture a dragged threshold even if its debounce has not fired.
             if (modeSelect?.value === 'threshold') await enqueuePartition(document.getElementById('meta-dendrogram').layout.shapes[0].y0);
             await pendingCut;
-            const response = await fetch('/api/projects/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, selected_mpts: window.getSelectedMpts() }) });
+            const response = await fetch('/api/projects/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, selected_mpts: window.getSelectedMpts(), explorer_selection: hierarchyExplorer.selection }) });
             const data = await response.json(); if (!response.ok) throw new Error(data.error);
             metadata = data.project; updateProjectInfo(); $('#saveProjectModalMain').modal('hide');
             alert('Analysis saved. Open Projects & History to reopen or download it.');
         } catch (error) { alert('Save error: ' + error.message); }
     };
-    function inspectHierarchy(mpts) {
-        const result = results?.[mpts], reach = result?.reachability_data;
-        if (!reach) return alert('This older project did not preserve detailed hierarchy arrays.');
-        if (!document.getElementById('hierarchyDetailModal')) document.body.insertAdjacentHTML('beforeend', `
-            <div id="hierarchyDetailModal" class="modal fade" tabindex="-1" role="dialog" aria-label="Detailed hierarchy">
-            <div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header">
-            <h5 id="hierarchy-detail-title"></h5><button class="close" data-dismiss="modal" aria-label="Close">&times;</button></div>
-            <div class="modal-body"><p class="small">Colors are flat-cluster labels within this hierarchy, not corresponding clusters across mpts. Black indicates noise. Hover shows the original sample index; drag to zoom.</p><div id="hierarchy-detail-plot" style="height:480px;"></div></div></div></div></div>`);
-        document.getElementById('hierarchy-detail-title').textContent = `Hierarchy: mpts = ${mpts} · ${result.metric || params.metric || 'metric unavailable'}`;
-        const colors = ['#1F6F5F', '#486B8A', '#C9823B', '#847A96', '#879C7D', '#A06F65', '#577F7A', '#8D8D88'];
-        const labels = [...new Set(reach.labels)].sort((a, b) => a - b);
-        const traces = labels.map((label, i) => {
-            const indices = reach.labels.map((value, j) => value === label ? j : -1).filter(j => j >= 0);
-            return { type: 'bar', name: label === -1 ? 'Noise' : `Cluster ${label}`,
-                x: indices.map(j => reach.x[j]), y: indices.map(j => reach.y[j]),
-                customdata: indices.map(j => reach.ordering?.[j] ?? j),
-                marker: { color: label === -1 ? '#000000' : colors[i % colors.length] },
-                hovertemplate: 'Sample %{customdata}<br>Hierarchy distance: %{y:.6f}<extra>%{fullData.name}</extra>' };
-        });
-        const description = document.querySelector('#hierarchyDetailModal p');
-        description.textContent = 'Colors are flat-cluster labels within this hierarchy, not corresponding clusters across mpts. Black indicates noise. Hover shows the original sample index; drag to zoom.';
-        if (labels.filter(label => label >= 0).length > colors.length) description.textContent += ' More than eight clusters: colors repeat; use legend and hover labels.';
-        $('#hierarchyDetailModal').one('shown.bs.modal', () => Plotly.react('hierarchy-detail-plot', traces, {
-            template: 'plotly_white', barmode: 'overlay', bargap: 0,
-            xaxis: { title: 'Sample order' }, yaxis: { title: 'Hierarchy reachability distance' },
-            legend: { orientation: 'h' }, margin: { t: 20, l: 65, r: 20, b: 65 }
-        }, { responsive: true, displaylogo: false }));
-        $('#hierarchyDetailModal').modal('show');
-    }
-    document.getElementById('inspect-hierarchy')?.addEventListener('click', () => inspectHierarchy(Number(document.getElementById('inspect-mpts').value)));
     window.exportSelectedBranchesCSV = async () => {
         if (!results) return alert('Run or load an analysis before exporting.');
         if (modeSelect?.value === 'manual' && !manualGroups.length) return alert('Select at least one branch before exporting manual meta-clusters.');

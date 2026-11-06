@@ -131,6 +131,11 @@ def save_project_route():
     analysis['times'] = SESSION_DATA.get('times', {})
     analysis['automatic_partition'] = SESSION_DATA.get('automatic_partition')
     analysis['manual_groups'] = SESSION_DATA.get('manual_groups', [])
+    explorer = data.get('explorer_selection', SESSION_DATA.get('explorer_selection', {}))
+    if not isinstance(explorer, dict):
+        return jsonify({'error': 'Explorer selection must be an object.'}), 400
+    analysis['explorer_selection'] = explorer
+    SESSION_DATA['explorer_selection'] = explorer
     
     meta = storage.save_project(name, params, analysis, results, raw_df)
     return jsonify({'success': True, 'project': meta})
@@ -166,6 +171,7 @@ def get_project_data(project_id):
         SESSION_DATA['hai_computation'] = analysis.get('hai_computation')
         SESSION_DATA['selected_mpts'] = analysis.get('selected_mpts', [])
         SESSION_DATA['manual_groups'] = analysis.get('manual_groups', [])
+        SESSION_DATA['explorer_selection'] = analysis.get('explorer_selection', {})
         
         return jsonify({
             'metadata': data.get('metadata'),
@@ -284,9 +290,20 @@ def batch_process():
         step = int(request.form.get('step', 1))
         metric = request.form.get('metric', 'euclidean')
         algorithm = request.form.get('algorithm', 'core-sg')
+        size_mode = request.form.get('min_cluster_size_mode', 'automatic')
+        if size_mode not in ('automatic', 'explicit'):
+            raise ValueError('Minimum cluster size mode must be automatic or explicit.')
+        size_text = request.form.get('min_cluster_size', '').strip()
+        if size_mode == 'explicit':
+            if not size_text:
+                raise ValueError('Enter a minimum cluster size for explicit mode.')
+            min_cluster_size = int(size_text)
+        else:
+            min_cluster_size = None
         
         # Run batch clustering
-        results = run_batch_clustering(df, min_mpts, max_mpts, step, metric=metric, algorithm=algorithm)
+        results = run_batch_clustering(df, min_mpts, max_mpts, step, metric=metric,
+                                       algorithm=algorithm, min_cluster_size=min_cluster_size)
         
         # Run meta-analysis
         from .core.batch import analyze_batch_results
@@ -306,6 +323,7 @@ def batch_process():
         SESSION_DATA['hai_computation'] = analysis.get('hai_computation')
         SESSION_DATA['selected_mpts'] = []
         SESSION_DATA['manual_groups'] = []
+        SESSION_DATA['explorer_selection'] = {}
         SESSION_DATA['selection_mode'] = 'automatic'
         SESSION_DATA['cut_threshold'] = None
         SESSION_DATA['times'] = analysis.get('times', {})
@@ -321,6 +339,8 @@ def batch_process():
             'metric': metric,
             'algorithm': algorithm
         }
+        SESSION_DATA['params'].update(min_cluster_size_mode=size_mode,
+                                      min_cluster_size=min_cluster_size)
         SESSION_DATA['params'].update(dataset_name=dataset_name, n_samples=len(df), execution_time=exec_time)
         SESSION_DATA['params']['csv_header'] = request.form.get('csv_header', 'auto') if not sample_dataset else 'present'
         
@@ -345,6 +365,44 @@ def batch_process():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+def _inspectable_hierarchy(mpts):
+    result = (SESSION_DATA.get('results') or {}).get(str(mpts))
+    if result is None:
+        raise ValueError('Select an mpts value from the active analysis.')
+    if not result.get('condensed_tree'):
+        raise ValueError('This older project has no condensed-tree data; rerun the analysis to inspect groups.')
+    return result
+
+
+@main.route('/api/hierarchies/<int:mpts>/groups/<int:group_id>')
+def inspect_group(mpts, group_id):
+    try:
+        from .core.group_tree import group_members
+        result = _inspectable_hierarchy(mpts)
+        members = group_members(result['condensed_tree'], result['n_samples'], group_id)
+        group = next((item for item in result['group_tree']['groups'] if item['id'] == group_id), None)
+        return jsonify({'mpts': mpts, 'group': group, 'sample_indices': members,
+                        'count': len(members),
+                        'flat_label_counts': {str(label): sum(result['labels'][i] == label for i in members)
+                                              for label in sorted(set(result['labels'][i] for i in members))}})
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+
+@main.route('/api/hierarchies/<int:mpts>/points/<int:point_id>')
+def inspect_point(mpts, point_id):
+    try:
+        from .core.group_tree import point_trajectory
+        result = _inspectable_hierarchy(mpts)
+        if point_id < 0 or point_id >= result['n_samples']:
+            raise ValueError('Point index is outside the dataset.')
+        return jsonify({'mpts': mpts, 'trajectory': point_trajectory(
+            result['condensed_tree'], result['n_samples'], point_id,
+            result['labels'][point_id])})
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
 
 @main.route('/cut_dendrogram', methods=['POST'])
 def cut_dendrogram():
@@ -465,6 +523,8 @@ def export_branches_csv():
                     export_df[f'Cluster_mpts_{mpts}'] = res['labels']
                 if 'probabilities' in res:
                     export_df[f'Prob_mpts_{mpts}'] = [round(p, 4) for p in res['probabilities']]
+                export_df[f'MinSamples_mpts_{mpts}'] = res.get('min_samples', int(mpts))
+                export_df[f'MinClusterSize_mpts_{mpts}'] = res.get('min_cluster_size', int(mpts))
 
         # Generate CSV string in memory
         output = io.StringIO()
