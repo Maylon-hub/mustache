@@ -4,6 +4,39 @@
     const clusterColor = label => Number(label) === -1 ? NOISE : `hsl(${(Number(label) * 137.508 + 155) % 360}, 55%, 37%)`;
     const lambdaText = (value, infinite = false) => infinite ? '∞' : value == null ? 'unavailable' : Number(value).toPrecision(5);
 
+    // Plot the fitted full single-linkage tree, not the size-condensed group tree.
+    // SciPy's default dendrogram traverses each linkage row's left child first;
+    // its leaves occupy positions 5, 15, ... . Divide those positions by 10
+    // and subtract 0.5 so x also indexes the reachability leaf order.
+    function individualDendrogramGeometry(linkage) {
+        if (!Array.isArray(linkage) || !linkage.length) throw new Error('This hierarchy has no linkage tree.');
+        const n = linkage.length + 1;
+        const order = [], stack = [2 * n - 2];
+        while (stack.length) {
+            const id = stack.pop();
+            if (id < n) { order.push(id); continue; }
+            const row = linkage[id - n];
+            if (!row) throw new Error('Invalid linkage node.');
+            stack.push(Number(row[1]), Number(row[0]));
+        }
+        if (order.length !== n || new Set(order).size !== n) throw new Error('Invalid linkage leaf order.');
+        const centre = Array(2 * n - 1), height = Array(2 * n - 1).fill(0);
+        order.forEach((id, position) => { centre[id] = position; });
+        const x = [], y = [], mergeX = [], mergeY = [], mergeSize = [];
+        linkage.forEach((row, index) => {
+            const left = Number(row[0]), right = Number(row[1]);
+            const value = Number(row[2]);
+            if (left >= n + index || right >= n + index || !Number.isFinite(value) || value < 0)
+                throw new Error('Invalid linkage merge.');
+            x.push(centre[left], centre[left], centre[right], centre[right], null);
+            y.push(height[left], value, value, height[right], null);
+            centre[n + index] = (centre[left] + centre[right]) / 2;
+            height[n + index] = value;
+            mergeX.push(centre[n + index]); mergeY.push(value); mergeSize.push(Number(row[3]));
+        });
+        return { order, x, y, mergeX, mergeY, mergeSize };
+    }
+
     class HierarchyExplorer {
         constructor() {
             this.selection = { mpts: null, group_id: null, point_id: null };
@@ -37,6 +70,8 @@
         async setData(analysis, results, params) {
             this.results = results;
             this.params = params || {};
+            this.selection = { mpts: null, group_id: null, point_id: null };
+            this.members = null;
             const ordered = (analysis?.ordered_mpts || []).map(Number);
             this.select.replaceChildren(...ordered.map(value => new Option(`mpts = ${value}`, value)));
             const saved = analysis?.explorer_selection || {};
@@ -65,9 +100,58 @@
                 `Algorithm: ${result.algorithm || this.params.algorithm} · mpts: ${mpts} · min_samples: ${result.min_samples ?? mpts} · minimum cluster size: ${result.min_cluster_size ?? mpts} (${mode}) · metric: ${result.metric || this.params.metric}`;
             this.status(`Inspecting mpts = ${mpts} · ${result.n_clusters} flat clusters · ${result.noise_points} noise points`);
             if (result.n_clusters === 0) this.status(`mpts = ${mpts}: no valid flat clusters; all ${result.n_samples} points are noise under this selection.`);
+            await this.drawIndividualDendrogram(result);
             await this.drawReachability(result);
             await this.drawGroupTree(result);
+            this.onHierarchyChange?.(mpts);
             if (scroll) document.getElementById('hierarchy-explorer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        async drawIndividualDendrogram(result) {
+            const div = document.getElementById('individual-dendrogram');
+            if (!result.linkage_z?.length) {
+                Plotly.purge(div);
+                div.textContent = 'This saved project has no individual linkage tree.';
+                return;
+            }
+            const geometry = individualDendrogramGeometry(result.linkage_z);
+            const n = geometry.order.length;
+            const expectedOrder = result.reachability_data?.method === 'hierarchy-adjacent-cophenetic'
+                ? result.reachability_data.ordering : null;
+            if (expectedOrder && expectedOrder.some((id, index) => Number(id) !== geometry.order[index]))
+                throw new Error('The dendrogram and reachability leaf orders disagree.');
+            div.style.setProperty('--dendrogram-min-width', `${Math.min(4800, n * 7)}px`);
+            const point = this.selection.point_id;
+            const markers = geometry.order.map(id => point === id ? '#D27A16'
+                : this.members === null || this.members.has(id) ? '#2C7896' : '#B9C2C8');
+            await Plotly.react(div, [
+                { type: 'scatter', mode: 'lines', x: geometry.x, y: geometry.y,
+                    line: { color: '#2F7EBA', width: 1.5 }, hoverinfo: 'skip', showlegend: false },
+                { type: 'scatter', mode: 'markers', x: geometry.mergeX, y: geometry.mergeY,
+                    customdata: geometry.mergeSize, marker: { color: '#2F7EBA', size: 4, opacity: 0.55 },
+                    hovertemplate: 'Merge of %{customdata} points<br>Distance %{y:.6f}<extra></extra>', showlegend: false },
+                { type: 'scatter', mode: 'markers', x: geometry.order.map((_, index) => index),
+                    y: geometry.order.map(() => 0), customdata: geometry.order,
+                    marker: { color: markers, size: geometry.order.map(id => id === point ? 12 : n > 500 ? 5 : 8),
+                        line: { color: '#FFFFFF', width: 0.5 } },
+                    hovertemplate: 'Input row %{customdata}<br>Click to trace this point<extra></extra>',
+                    cliponaxis: false, meta: { role: 'individual-leaves' }, showlegend: false },
+            ], {
+                template: 'plotly_white', showlegend: false, hovermode: 'closest',
+                xaxis: { title: 'Leaf order (input row on hover)', range: [-1, n],
+                    dtick: Math.max(1, Math.ceil(n / 15)) },
+                yaxis: { title: 'Linkage merge distance', rangemode: 'tozero' },
+                margin: { t: 20, l: 75, r: 20, b: 70 }, uirevision: `hierarchy-${result.mpts}`,
+            }, { responsive: true, displaylogo: false });
+            div.removeAllListeners?.('plotly_click');
+            div.on('plotly_click', event => {
+                const clicked = event.points?.[0];
+                if (clicked?.data?.meta?.role !== 'individual-leaves') return;
+                const id = Number(clicked.customdata);
+                if (Number.isInteger(id)) this.selectPoint(id);
+            });
+            document.getElementById('individual-dendrogram-stats').textContent =
+                `· mpts = ${result.mpts} · ${n} input points · ${n - 1} merges`;
         }
 
         async drawReachability(result) {
@@ -190,6 +274,7 @@
                 document.getElementById('group-detail').textContent =
                     `Group ${groupId} · ${data.count} input rows · born at λ = ${lambdaText(group.birth_lambda, group.birth_lambda_infinite)} · size at birth ${group.size_at_birth} · ${group.point_departures} direct point departures · final flat labels: ${JSON.stringify(data.flat_label_counts)} · rows: ${data.sample_indices.slice(0, 80).join(', ')}${data.count > 80 ? '…' : ''}`;
                 await this.drawReachability(this.results[mpts]);
+                await this.drawIndividualDendrogram(this.results[mpts]);
                 await this.drawGroupTree(this.results[mpts]);
                 this.status(`Group ${groupId} selected · ${data.count} points highlighted`);
             } catch (error) { this.status(error.message, true); }
@@ -224,10 +309,12 @@
                 target.append(list);
                 const note = document.createElement('p'); note.textContent = trajectory.note; target.append(note);
                 await this.drawReachability(result);
+                await this.drawIndividualDendrogram(result);
                 this.status(`Input row ${pointId} traced in mpts = ${mpts}`);
             } catch (error) { this.status(error.message, true); }
         }
     }
     window.HierarchyExplorer = HierarchyExplorer;
+    window.mustacheIndividualDendrogramGeometry = individualDendrogramGeometry;
     window.mustacheClusterColor = clusterColor;
 })();

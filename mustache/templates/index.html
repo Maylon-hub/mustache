@@ -45,6 +45,7 @@
                 <span id="manual-selection-help" class="small text-muted my-1 ml-1" style="display:none;">
                     Click a circle at an internal node to select its descendant hierarchies.
                 </span>
+                <span class="small text-muted my-1 ml-1">Click a leaf circle (mpts) to inspect its individual hierarchy.</span>
                 <button id="btn-clear-selection" type="button" class="btn btn-sm btn-link text-muted"
                     style="display:none;" onclick="clearSelectedBranches()" title="Clear manually selected branches">
                     Clear selection
@@ -114,7 +115,12 @@
         </div>
         <div class="card-body">
             <div id="explorer-params" class="small mb-3" aria-live="polite"></div>
-            <p class="small text-muted">The reachability view uses adjacent merge heights in this hierarchy, not an OPTICS ordering. Group-tree horizontal position is <strong>lambda</strong> (inverse separation distance), not distance. Cluster IDs are internal tree IDs; point IDs are zero-based input row indices. Branches below the minimum cluster size appear as point departures rather than separate groups.</p>
+            <p class="small text-muted">The individual dendrogram shows every merge in the selected full hierarchy. The reachability view uses adjacent merge heights from that same hierarchy, not an OPTICS ordering. The condensed group tree applies the minimum cluster size; its horizontal position is <strong>lambda</strong> (inverse separation distance), not distance. Cluster IDs are internal tree IDs; point IDs are zero-based input row indices. Branches below the minimum cluster size appear as point departures rather than separate groups.</p>
+            <div class="mb-3">
+                <h6>Individual Hierarchy Dendrogram <small id="individual-dendrogram-stats" class="text-muted"></small></h6>
+                <p class="small text-muted mb-1">Each leaf is an input point. Branch height is linkage merge distance using the selected metric. Click a leaf marker to trace that input row; scroll horizontally when there are many points.</p>
+                <div class="individual-dendrogram-scroll"><div id="individual-dendrogram" class="explorer-plot" aria-label="Dendrogram of the selected hierarchy"></div></div>
+            </div>
             <div class="explorer-plots">
                 <div><h6>Reachability Plot <small id="explorer-reach-stats" class="text-muted"></small></h6><div id="hierarchy-detail-plot" class="explorer-plot"></div></div>
                 <div><h6>Group tree (condensed hierarchy)</h6><div id="group-tree-plot" class="explorer-plot"></div></div>

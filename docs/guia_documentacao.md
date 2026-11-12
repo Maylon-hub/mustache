@@ -82,8 +82,10 @@ selection replaces overlapping selected groups. Unselected hierarchies are not
 automatic outliers. Selected descendants are also saved and exported. This does
 not select clusters of dataset points. Full legacy FOSC controls are not exposed.
 The Hierarchy Explorer opens any generated hierarchy, including non-medoids and
-meta-clustering outliers. It shows that hierarchy's reachability, condensed
-group tree and input-row point trajectories. Flat-cluster colors are stable
+meta-clustering outliers. Click a leaf circle at the base of the meta-dendrogram
+to open its `mpts`; internal circles still select manual meta-clusters. The
+explorer shows that hierarchy's full dendrogram, reachability, condensed group
+tree and input-row point trajectories. Flat-cluster colors are stable
 within a hierarchy; noise is gray and remains label −1. The chart reports
 cluster and noise counts.
 Cluster colors do not imply corresponding clusters across different mpts.
@@ -146,8 +148,15 @@ implemented.
 
 ## Explore one hierarchy and one input row
 
-After a batch, use **Hierarchy (mpts)** in the Hierarchy Explorer to inspect
-any fitted tree. Its reachability bars are ordered by that tree's leaves;
+After a batch, click a leaf circle in the meta-dendrogram or use
+**Hierarchy (mpts)** in the Hierarchy Explorer to inspect any fitted tree.
+The individual dendrogram displays every merge of that hierarchy's saved
+single-linkage tree. Its vertical axis is linkage merge distance, and its
+horizontal axis is leaf order. It is distinct from both the meta-dendrogram,
+which clusters *hierarchies*, and the condensed group tree below it, which
+uses `min_cluster_size`. A leaf marker in the individual dendrogram opens the
+corresponding original input-row trajectory. Its reachability bars are ordered
+by that same tree's leaves;
 hover shows the original zero-based input row position. That row position is
 not the leaf position and is never a condensed-tree group ID. Click a bar or
 enter a row position under **Point trajectory** to trace the point from the

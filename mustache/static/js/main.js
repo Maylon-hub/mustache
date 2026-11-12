@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let representativeSignature = '';
     const form = document.getElementById('batch-form');
     const hierarchyExplorer = new window.HierarchyExplorer();
+    hierarchyExplorer.onHierarchyChange = () => refreshSelection();
     const modeSelect = document.getElementById('meta-selection-mode');
     const scaleSelect = document.getElementById('hai-scale-mode');
     const settingsKey = 'mustache.settings.v1';
@@ -96,6 +97,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (clear) clear.style.display = manualGroups.length && modeSelect.value === 'manual' ? 'inline-block' : 'none';
         const div = document.getElementById('meta-dendrogram');
         div?.data?.forEach((trace, i) => {
+            if (trace.meta?.role === 'hierarchy-leaves') {
+                const current = hierarchyExplorer.selection.mpts;
+                const colors = trace.customdata.map(value => Number(value) === current ? '#D27A16' : '#FFFFFF');
+                const sizes = trace.customdata.map(value => Number(value) === current ? 16 : 12);
+                Plotly.restyle(div, { 'marker.color': [colors], 'marker.size': [sizes] }, [i]);
+                return;
+            }
             if (trace.meta?.role === 'branch-targets') {
                 const groups = trace.meta.branch_members || {};
                 const colors = trace.customdata.map(id => manualGroups.some(group => sameGroup(group, groups[id] || [])) ? '#1F6F5F' : '#FFFFFF');
@@ -199,6 +207,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     showlegend: false });
             }
         }
+        // Leaves identify individual hierarchies; internal nodes continue to
+        // select meta-clusters. Insert before branch targets so their existing
+        // trace and physical-click tests retain the same last-trace position.
+        if (!figure.data.some(trace => trace.meta?.role === 'hierarchy-leaves')) {
+            const axis = figure.layout?.xaxis || {};
+            let leaves = (axis.tickvals || []).map((x, index) => ({
+                x: Number(x), mpts: Number(axis.ticktext?.[index]),
+            })).filter(item => Number.isFinite(item.x) && analysis.ordered_mpts.includes(item.mpts));
+            if (leaves.length !== analysis.ordered_mpts.length && analysis.ordered_mpts.length === 1)
+                leaves = [{ x: 5, mpts: Number(analysis.ordered_mpts[0]) }];
+            if (leaves.length === analysis.ordered_mpts.length) {
+                const trace = { type: 'scatter', mode: 'markers', x: leaves.map(item => item.x),
+                    y: leaves.map(() => 0), customdata: leaves.map(item => item.mpts),
+                    marker: { size: 12, color: '#FFFFFF', line: { color: '#2C7896', width: 2 } },
+                    hovertemplate: 'Open hierarchy: mpts = %{customdata}<br>Click to inspect its dendrogram and groups<extra></extra>',
+                    cliponaxis: false, meta: { role: 'hierarchy-leaves' }, showlegend: false };
+                const branchIndex = figure.data.findIndex(item => item.meta?.role === 'branch-targets');
+                figure.data.splice(branchIndex < 0 ? figure.data.length : branchIndex, 0, trace);
+            }
+        }
         figure.layout.hovermode = 'closest';
         figure.layout.hoverdistance = 12;
         figure.layout.margin = { t: 50, r: 20, l: 60, b: 55 };
@@ -225,23 +253,34 @@ document.addEventListener('DOMContentLoaded', () => {
         div._branchCursorHandler = event => {
             const overlay = div.querySelector('.draglayer .nsewdrag');
             if (!overlay) return;
-            const markers = div.querySelectorAll('.scatterlayer .trace:last-child .points path');
-            const onTarget = tool === 'select' && Array.from(markers).some(marker => {
+            const branchMarkers = div.querySelectorAll('.scatterlayer .trace:last-child .points path');
+            const leaves = div.querySelectorAll('.hierarchy-leaf-targets .points path');
+            const hit = markers => Array.from(markers).some(marker => {
                 const box = marker.getBoundingClientRect();
                 return event.clientX >= box.left && event.clientX <= box.right &&
                     event.clientY >= box.top && event.clientY <= box.bottom;
             });
-            div.classList.toggle('over-branch-target', onTarget);
+            div.classList.toggle('over-leaf-target', hit(leaves));
+            div.classList.toggle('over-branch-target', tool === 'select' && hit(branchMarkers));
         };
+        const leafTraceIndex = div.data.findIndex(trace => trace.meta?.role === 'hierarchy-leaves');
+        div.querySelectorAll('.scatterlayer .trace')[leafTraceIndex]?.classList.add('hierarchy-leaf-targets');
         div.addEventListener('mousemove', div._branchCursorHandler, true);
         if (div._branchCursorLeaveHandler) div.removeEventListener('mouseleave', div._branchCursorLeaveHandler);
         div._branchCursorLeaveHandler = () => {
             div.classList.remove('over-branch-target');
+            div.classList.remove('over-leaf-target');
         };
         div.addEventListener('mouseleave', div._branchCursorLeaveHandler);
         div.on('plotly_click', event => {
-            if (tool !== 'select') return;
             const point = event.points?.[0];
+            if (point?.data?.meta?.role === 'hierarchy-leaves') {
+                const mpts = Number(point.customdata ?? point.data.customdata?.[point.pointNumber]);
+                if (analysis.ordered_mpts.includes(mpts)) hierarchyExplorer.open(mpts, { scroll: true })
+                    .catch(error => alert('Hierarchy inspection error: ' + error.message));
+                return;
+            }
+            if (tool !== 'select') return;
             if (point?.data?.meta?.role !== 'branch-targets') return;
             const nodeId = String(point.customdata ?? point.data.customdata?.[point.pointNumber]);
             const values = (point.data.meta.branch_members?.[nodeId] || []).map(Number);

@@ -203,9 +203,13 @@ body {
 
 .dendrogram-scroll { overflow-x: auto; }
 #meta-dendrogram .scatterlayer .trace:last-child .points path { cursor: pointer; }
+#meta-dendrogram .hierarchy-leaf-targets .points path { cursor: pointer; }
 #meta-dendrogram.over-branch-target,
 #meta-dendrogram.over-branch-target .draglayer,
-#meta-dendrogram.over-branch-target .draglayer * { cursor: pointer !important; }
+#meta-dendrogram.over-branch-target .draglayer *,
+#meta-dendrogram.over-leaf-target,
+#meta-dendrogram.over-leaf-target .draglayer,
+#meta-dendrogram.over-leaf-target .draglayer * { cursor: pointer !important; }
 
 /* Reachability multiple plot styling */
 .reachability-plot-wrapper {
@@ -216,6 +220,9 @@ body {
 }
 
 .hierarchy-explorer { flex: 0 0 auto; }
+.individual-dendrogram-scroll { width: 100%; overflow-x: auto; }
+#individual-dendrogram { min-width: var(--dendrogram-min-width, 0px); }
+#individual-dendrogram .scatterlayer .trace:last-child .points path { cursor: pointer; }
 .explorer-plots, .explorer-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .explorer-plot { width: 100%; height: 460px; min-height: 460px; }
 .explorer-details { margin-top: 15px; }
