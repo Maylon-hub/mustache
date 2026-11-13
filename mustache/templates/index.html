@@ -95,11 +95,14 @@
                     style="font-size: 0.75rem;"></span>
             </div>
             <div class="card-body p-0">
-                <!-- We will append multiple reachability plots here side-by-side -->
                 <p class="small text-muted px-3 pt-2 mb-1">Representative hierarchy (medoid): the mpts minimizing the sum of 1 − HAI within each meta-cluster. Automatic meta-clustering outliers are shown separately.</p>
                 <p class="small text-muted px-3 pb-2 mb-0">Choose any mpts in the Hierarchy Explorer below for its group tree and point trajectories.</p>
-                <div id="reachability-container" class="d-flex" style="overflow-x: auto; height: 420px;">
-                    <!-- JS will populate individual reachability plots -->
+                <div class="reachability-navigation px-3 pb-2" aria-label="Navigate representative hierarchies">
+                    <button type="button" id="reachability-prev" class="btn btn-sm btn-outline-secondary" aria-label="Previous representative hierarchy" disabled>Previous</button>
+                    <span id="reachability-position" class="small text-muted mx-2" role="status">No representatives</span>
+                    <button type="button" id="reachability-next" class="btn btn-sm btn-outline-secondary" aria-label="Next representative hierarchy" disabled>Next</button>
+                </div>
+                <div id="reachability-container" class="d-flex" tabindex="0" aria-label="Representative reachability plots; use Previous and Next to navigate">
                     <div class="text-muted p-3">Run Batch Analysis to generate meta-clusters.</div>
                 </div>
             </div>
@@ -115,7 +118,7 @@
         </div>
         <div class="card-body">
             <div id="explorer-params" class="small mb-3" aria-live="polite"></div>
-            <p class="small text-muted">The individual dendrogram shows every merge in the selected full hierarchy. The reachability view uses adjacent merge heights from that same hierarchy, not an OPTICS ordering. The condensed group tree applies the minimum cluster size; its horizontal position is <strong>lambda</strong> (inverse separation distance), not distance. Cluster IDs are internal tree IDs; point IDs are zero-based input row indices. Branches below the minimum cluster size appear as point departures rather than separate groups.</p>
+            <p class="small text-muted">The full dendrogram shows every merge; the reachability view uses adjacent merge heights from that same hierarchy, not OPTICS. The condensed tree filters that hierarchy by minimum cluster size. Its vertical axis is <strong>λ = 1 / separation distance</strong>; each band spans the input points still in a group, so its width shrinks as points leave. Cluster IDs are internal tree IDs; point IDs are zero-based input row indices.</p>
             <div class="mb-3">
                 <h6>Individual Hierarchy Dendrogram <small id="individual-dendrogram-stats" class="text-muted"></small></h6>
                 <p class="small text-muted mb-1">Each leaf is an input point. Branch height is linkage merge distance using the selected metric. Click a leaf marker to trace that input row; scroll horizontally when there are many points.</p>
@@ -123,7 +126,7 @@
             </div>
             <div class="explorer-plots">
                 <div><h6>Reachability Plot <small id="explorer-reach-stats" class="text-muted"></small></h6><div id="hierarchy-detail-plot" class="explorer-plot"></div></div>
-                <div><h6>Group tree (condensed hierarchy)</h6><div id="group-tree-plot" class="explorer-plot"></div></div>
+                <div><h6>Condensed Cluster Tree</h6><p class="small text-muted mb-1">Green bands are groups; band width represents points remaining. Round markers select groups. Orange triangles select small linkage subgroups discarded during condensation; gray diamonds mark individual departures. The last departure λ is hierarchical noise onset, separate from the final EOM flat label.</p><div id="group-tree-plot" class="explorer-plot"></div></div>
             </div>
             <div class="explorer-details">
                 <div><h6>Selected group</h6><div id="group-detail" class="small text-muted">Click a group marker in the tree.</div></div>

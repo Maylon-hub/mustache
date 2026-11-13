@@ -164,17 +164,45 @@ root through descendant groups to its singleton departure. The trajectory
 shows group sizes at birth and the lambda values at which it leaves each
 group. Its final flat label is reported separately: a singleton departure does
 not by itself mean the flat partition labels the point as noise.
+For a point in a particular group, `lambda_p` is the lambda at which it exits
+that group. The final singleton departure gives one well-defined **hierarchical
+noise-onset lambda** in the condensed tree: from that density level onward the
+point belongs to no condensed group. This is distinct from the EOM flat noise
+label, which is selected globally and has no additional, universal transition
+lambda. A point can leave its last group even when its final flat label is a
+cluster. This terminology follows the HDBSCAN* hierarchy and stability
+definition; the modern CORE-SG path applies it to the condensed tree derived
+from CORE-SG's linkage, without claiming equality to an independent HDBSCAN fit.
 
-The **Group tree** is built from the condensed tree returned by the same
-HDBSCAN tree-selection call used for the fitted linkage's labels, without a
-second clustering fit. This is a cluster-only layout: horizontal position is
-`lambda = 1 / separation distance`, while vertical position only spreads
-branches for reading. Marker size and branch width help show group size;
-diamonds aggregate points leaving a group. Descendants smaller than the
-minimum cluster size appear as point departures instead of independent group
-nodes. Click a round group marker to highlight all input rows descending from
-that group at its birth. The group detail also reports the distribution of
-final flat labels among those rows.
+The **Condensed Cluster Tree** is built from the condensed tree returned by
+the same HDBSCAN tree-selection call used for the fitted linkage's labels,
+without a second clustering fit. It follows the familiar condensed-tree
+representation: vertical position is `lambda = 1 / separation distance`;
+the horizontal axis follows the full dendrogram's leaf order; each band's
+width is the number of original points still belonging to that group at the
+displayed lambda. Bands narrow as points leave and split into child bands
+when valid groups form. Gray diamonds show individual point departures.
+Descendants smaller than the effective condensation threshold appear as
+departures instead of valid group nodes. Click a round group marker to
+highlight all input rows descending from that group at its birth. The group
+detail also reports the distribution of final flat labels among those rows.
+When the full linkage is available, orange triangles show the exact small
+linkage subgroups pruned at each split. Click a triangle to highlight its input
+rows. These are diagnostic subgroups from the full linkage, **not** valid
+condensed groups or selected flat clusters. Their membership and lambda are
+checked against the HDBSCAN 0.8.44 condensed-tree departures. Older saved
+projects without this annotation still open; rerun the analysis to display it.
+
+Scientific basis: the original MustaCHE article presents the meta-hierarchy
+and hierarchy-specific reachability plots; the CORE-SG article constructs a
+support graph at `k_max` and extracts a new MST for each smaller `mpts`.
+The [HDBSCAN condensation and stability explanation](https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html)
+defines point-specific `lambda_p` relative to a group and distinguishes
+condensation from EOM flat-cluster extraction. The
+[HDBSCAN condensed-tree guide](https://hdbscan.readthedocs.io/en/latest/advanced_hdbscan.html)
+documents the parent, child, lambda and child-size fields used here. These
+sources justify the hierarchical departure interpretation; they do not
+establish a separate EOM flat-noise transition level for each point.
 
 For CORE-SG, the condensed tree is derived from its already extracted
 single-linkage hierarchy through the pinned HDBSCAN 0.8.44 tree-processing

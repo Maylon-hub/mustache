@@ -93,6 +93,10 @@ def run(output: Path):
                 check('explicit size and min_samples distinct', all(
                     body['results'][str(m)]['min_cluster_size'] == 8 and
                     body['results'][str(m)]['min_samples'] == m for m in (2, 4, 6)))
+                pruned = body['results']['2']['group_tree']['pruned_subgroups']
+                check('small linkage subgroups reconstructed from the same hierarchy',
+                      bool(pruned) and all(1 < item['size'] < 9 and
+                      item['id_namespace'] == 'full_linkage_node' for item in pruned))
                 page.locator('.modal-backdrop').wait_for(state='detached')
                 page.wait_for_function("document.querySelector('#group-tree-plot')?.data?.at(-1)?.meta?.role === 'group-targets'", timeout=30000)
                 check('explorer shows effective parameters', 'minimum cluster size: 8 (explicit)'
@@ -154,6 +158,41 @@ def run(output: Path):
                 check('automatic meta-clusters return after leaf inspection', automatic_wait.value.ok)
 
                 group_plot = page.locator('#group-tree-plot')
+                check('condensed tree ribbons encode remaining members and lambda', group_plot.evaluate(
+                    '''(element, expected) => element.data[0].fill === 'toself' &&
+                        Math.abs(element.data[0].x[1] - element.data[0].x[0] - expected) < .1 &&
+                        element.layout.yaxis.range[0] > element.layout.yaxis.range[1] &&
+                        element.layout.yaxis.title.text.includes('λ')''', body['results']['2']['n_samples']))
+                check('at least one condensed ribbon narrows after point departures', group_plot.evaluate(
+                    '''element => element.data.filter(trace => trace.fill === 'toself').some(trace => {
+                        const widths = [];
+                        for (let index = 0; index < trace.x.length; index += 6)
+                            widths.push(trace.x[index + 1] - trace.x[index]);
+                        return widths.some((width, index) => index > 0 && width < widths[index - 1]);
+                    })'''))
+                check('pruned markers preserve true lambda', group_plot.evaluate(
+                    '''(element, items) => element.data.at(-2).y.every((value, index) =>
+                        items[index].lambda_infinite || Math.abs(value - items[index].lambda_val) < 1e-10)''',
+                    pruned))
+                pruned_info = group_plot.evaluate('''element => {
+                    const trace = element.data.at(-2);
+                    return {ids: trace.customdata, role: trace.meta.role};
+                }''')
+                check('pruned subgroups have separate browser markers',
+                      pruned_info['role'] == 'pruned-subgroup-targets' and
+                      pruned_info['ids'] == [item['id'] for item in pruned])
+                pruned_marker = page.locator('#group-tree-plot .scatterlayer .trace:nth-last-child(2) .points path').first
+                pruned_marker.scroll_into_view_if_needed()
+                pruned_box = pruned_marker.bounding_box()
+                check('pruned subgroup is physically clickable', bool(pruned_box and pruned_box['width'] >= 7))
+                page.mouse.click(pruned_box['x'] + pruned_box['width'] / 2,
+                                 pruned_box['y'] + pruned_box['height'] / 2)
+                page.wait_for_function("id => document.querySelector('#group-detail')?.textContent?.includes(`Full-linkage subgroup ${id}`)",
+                                       arg=pruned[0]['id'])
+                check('pruned subgroup highlights original input rows',
+                      'not a valid condensed group' in page.locator('#group-detail').inner_text()
+                      and 'points highlighted' in page.locator('#explorer-status').inner_text())
+                page.screenshot(path=str(output / 'explorer-pruned-subgroup.png'), full_page=True)
                 marker_info = group_plot.evaluate('''element => {
                     const trace = element.data.at(-1);
                     return {ids: trace.customdata, role: trace.meta.role,
@@ -194,6 +233,10 @@ def run(output: Path):
                 trajectory = point_response.json()['trajectory']
                 check('original row has ancestry', trajectory['point_id'] == point_id and
                       len(trajectory['groups']) >= 2 and trajectory['groups'][0]['group_id'] == marker_info['root'])
+                check('hierarchical noise onset remains separate from EOM flat label',
+                      trajectory['hierarchical_noise_onset_lambda'] == trajectory['point_departure_lambda']
+                      and trajectory['flat_noise_transition_lambda'] is None
+                      and 'hierarchical noise onset' in page.locator('#point-trajectory').inner_text())
                 check('point shown on reachability', f'Input row {point_id}' in
                       page.locator('#point-trajectory').inner_text() and
                       len(page.locator('#hierarchy-detail-plot').evaluate('(e) => e.layout.shapes || []')) == 1)
@@ -240,6 +283,11 @@ def run(output: Path):
                       page.locator('#individual-dendrogram').evaluate(
                           '(element) => element.data.at(-1).customdata.length === 150')
                       and page.locator('#meta-dendrogram .hierarchy-leaf-targets .points path').count() == 3)
+                check('reopen retains exact pruned-subgroup annotations',
+                      page.locator('#group-tree-plot').evaluate(
+                          '(element) => element.data.at(-2).meta.role === "pruned-subgroup-targets"')
+                      and page.locator('#group-tree-plot .scatterlayer .trace:nth-last-child(2) .points path').count()
+                      == len(pruned))
                 page.screenshot(path=str(output / 'explorer-after-reopen.png'), full_page=True)
                 page.locator('#hierarchy-explorer').screenshot(path=str(output / 'explorer-panel-after-reopen.png'))
                 with page.expect_download() as csv_wait:
@@ -248,6 +296,36 @@ def run(output: Path):
                 check('CSV exports size metadata', 'MinClusterSize_mpts_' in csv_path.read_text(encoding='utf-8'))
                 zip_response = page.request.get(base + f'/api/projects/{project_id}/export_zip')
                 check('ZIP export available', zip_response.ok and zip_response.body()[:2] == b'PK')
+
+                pruned_marker = page.locator('#group-tree-plot .scatterlayer .trace:nth-last-child(2) .points path').first
+                pruned_marker.scroll_into_view_if_needed()
+                pruned_box = pruned_marker.bounding_box()
+                page.mouse.click(pruned_box['x'] + pruned_box['width'] / 2,
+                                 pruned_box['y'] + pruned_box['height'] / 2)
+                page.wait_for_function("id => document.querySelector('#group-detail')?.textContent?.includes(`Full-linkage subgroup ${id}`)",
+                                       arg=pruned[0]['id'])
+                check('pruned selection replaces condensed group selection',
+                      'Full-linkage subgroup' in page.locator('#group-detail').inner_text()
+                      and 'Pruned linkage subgroup' in page.locator('#explorer-status').inner_text())
+                page.locator('#btn-save-top').click()
+                page.locator('#main-save-proj-name').fill('Pruned subgroup E2E')
+                with page.expect_response(lambda response: response.url.endswith('/api/projects/save')) as pruned_save:
+                    page.locator('#saveProjectModalMain .btn-success').click()
+                pruned_id = pruned_save.value.json()['project']['id']
+                saved_pruned = page.request.get(base + f'/api/projects/{pruned_id}/data').json()
+                check('saved project records pruned subgroup ID and namespace',
+                      saved_pruned['analysis']['explorer_selection']['pruned_id'] == pruned[0]['id']
+                      and saved_pruned['results']['2']['group_tree']['pruned_subgroups'][0]['id_namespace']
+                      == 'full_linkage_node')
+                server.terminate(); server.wait(timeout=15)
+                start()
+                page.goto(base + f'/?project_id={pruned_id}')
+                page.wait_for_function("id => document.querySelector('#group-detail')?.textContent?.includes(`Full-linkage subgroup ${id}`)",
+                                       arg=pruned[0]['id'], timeout=30000)
+                check('real restart restores pruned subgroup and highlighted members',
+                      page.locator('#inspect-mpts').input_value() == '2'
+                      and page.locator('#individual-dendrogram').evaluate(
+                          '(element) => element.data.at(-1).marker.color.includes("#B9C2C8")'))
 
                 page.set_viewport_size({'width': 780, 'height': 900})
                 page.wait_for_timeout(500)

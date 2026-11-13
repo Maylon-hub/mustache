@@ -341,8 +341,25 @@ document.addEventListener('DOMContentLoaded', () => {
         scaleSelect.addEventListener('change', renderHAI);
     }
 
+    const reachContainer = document.getElementById('reachability-container');
+    const reachPrev = document.getElementById('reachability-prev');
+    const reachNext = document.getElementById('reachability-next');
+    const reachPosition = document.getElementById('reachability-position');
+    function updateReachabilityNavigation() {
+        if (!reachContainer) return;
+        const total = reachContainer.querySelectorAll('.reachability-plot-wrapper').length;
+        const page = total ? Math.min(total - 1, Math.round(reachContainer.scrollLeft /
+            Math.max(1, reachContainer.clientWidth))) : 0;
+        if (reachPosition) reachPosition.textContent = total ? `${page + 1} of ${total}` : 'No representatives';
+        if (reachPrev) reachPrev.disabled = page === 0;
+        if (reachNext) reachNext.disabled = page >= total - 1;
+    }
+    reachPrev?.addEventListener('click', () => reachContainer.scrollBy({ left: -reachContainer.clientWidth, behavior: 'smooth' }));
+    reachNext?.addEventListener('click', () => reachContainer.scrollBy({ left: reachContainer.clientWidth, behavior: 'smooth' }));
+    reachContainer?.addEventListener('scroll', updateReachabilityNavigation);
+
     function renderReachability(cached = false) {
-        const container = document.getElementById('reachability-container');
+        const container = reachContainer;
         if (!container) return;
         const representatives = Object.entries(analysis.medoids || {}).map(([group, mpts]) => ({ group, mpts: Number(mpts), outlier: false }));
         const outliers = (analysis.outliers || []).map(mpts => ({ mpts: Number(mpts), outlier: true }));
@@ -357,17 +374,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = results?.[mpts];
             if (!result?.reachability_data && !result?.reachability_json) return;
             const wrapper = document.createElement('div');
-            wrapper.className = 'reachability-plot-wrapper mr-3 flex-shrink-0'; wrapper.style.width = '360px';
+            wrapper.className = 'reachability-plot-wrapper';
             const heading = document.createElement('div'); heading.className = 'small px-3 pt-2';
             heading.textContent = outlier ? `Meta-clustering outlier: mpts = ${mpts}` : `Representative hierarchy (medoid): mpts = ${mpts}`;
             heading.title = outlier ? 'No automatic meta-cluster contains this hierarchy; it is not a medoid.' : `Meta-cluster ${group}: minimizes the sum of 1 − HAI to other hierarchies in this group.`;
             const note = document.createElement('div'); note.className = 'small text-muted px-3';
             const reach = result.reachability_data;
             note.textContent = reach?.method === 'hierarchy-adjacent-cophenetic'
-                ? `${outlier ? 'Meta-clustering outlier' : 'Meta-cluster ' + group} · ${result.n_clusters} flat clusters · ${result.noise_points}/${result.n_samples} sample noise · distances from this hierarchy`
+                ? `${outlier ? 'Meta-clustering outlier' : 'Meta-cluster ' + group} · ${result.n_clusters} flat clusters · ${result.noise_points}/${result.n_samples} sample noise · colors distinguish flat clusters; inspect for full legend`
                 : 'Older saved layout: geometry may be shared across mpts.';
             if (result.n_clusters === 0) note.textContent += ' · No valid flat clusters at this minimum cluster size.';
-            const chart = document.createElement('div'); chart.style.height = '345px';
+            const chart = document.createElement('div'); chart.style.height = '330px';
             wrapper.append(heading, note, chart); container.append(wrapper);
             const inspect = document.createElement('button');
             inspect.className = 'btn btn-sm btn-link px-3'; inspect.textContent = 'Inspect hierarchy';
@@ -386,10 +403,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     legend: { orientation: 'h' }, xaxis: { title: 'Leaf order' },
                     yaxis: { title: 'Hierarchy reachability distance', rangemode: 'tozero' } }
             } : JSON.parse(result.reachability_json);
-            Object.assign(figure.layout, { title: '', annotations: [], font: { size: 12 }, margin: { t: 10, r: 15, l: 65, b: 55 } });
+            Object.assign(figure.layout, { title: '', annotations: [], showlegend: false,
+                font: { size: 12 }, margin: { t: 10, r: 25, l: 75, b: 60 } });
             Plotly.newPlot(chart, figure.data, figure.layout, { responsive: true, displayModeBar: false });
         });
         if (!container.children.length) container.textContent = 'No representative hierarchies are available.';
+        container.scrollLeft = 0;
+        updateReachabilityNavigation();
     }
 
     async function renderAnalysis() {

@@ -74,11 +74,15 @@ it has host, port and debug options, not batch-processing subcommands.
    non-overlapping branches form additional groups; overlapping selections
    replace earlier groups.
 5. Inspect **Reachability Plots** for representatives and separately identified
-   meta-clustering outliers. Click a leaf circle at the base of the
+   meta-clustering outliers. Use **Previous** and **Next** to view one complete
+   representative plot at a time; **Inspect hierarchy** opens its detailed
+   view. Click a leaf circle at the base of the
    **Meta-Hierarchy Dendrogram** to open that `mpts` in the **Hierarchy Explorer**.
-   It shows the full individual dendrogram, reachability plot, condensed group
-   tree, group membership and the trajectory of an original input row. Noise is gray;
-   flat-cluster labels are local to each hierarchy.
+   It shows the full individual dendrogram, reachability plot, a condensed
+   cluster tree with bands sized by remaining group membership, and the
+   trajectory of an original input row. Orange triangles expose small linkage
+   subgroups pruned during condensation. Noise is gray; flat-cluster labels
+   are local to each hierarchy.
 6. **Save Analysis**, then reopen it from **Projects & History** without rerunning
    clustering. **Export CSV** exports selected hierarchies, or active
    representatives when there is no manual selection.

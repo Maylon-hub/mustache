@@ -344,6 +344,21 @@ def run(base: str, output: Path, project_root: Path | None = None, restart_serve
         check("two independent branches coexist", pair["manual_groups"] == [first_group, second_group]
               and "2 branches selected" in page.locator("#selected-branches-badge").inner_text()
               and page.locator(".reachability-plot-wrapper").count() == 2)
+        check("representative navigation starts at first of two",
+              page.locator("#reachability-position").inner_text() == "1 of 2"
+              and page.locator("#reachability-next").is_enabled())
+        check("representative chart is not vertically clipped", page.locator("#reachability-container").evaluate(
+            "element => { const chart = element.querySelector('.reachability-plot-wrapper > div:last-child').getBoundingClientRect(); return chart.bottom <= element.getBoundingClientRect().bottom + 2 && chart.bottom <= element.closest('.pane-bottom-right').getBoundingClientRect().bottom + 2; }"))
+        page.locator("#reachability-next").click()
+        page.wait_for_function("document.querySelector('#reachability-position')?.textContent === '2 of 2'")
+        page.wait_for_function("document.querySelector('#reachability-container').scrollLeft >= document.querySelector('#reachability-container').clientWidth * .8")
+        check("next button exposes second representative", page.locator("#reachability-container").evaluate(
+            "element => element.scrollLeft >= element.clientWidth * .8")
+            and page.locator("#reachability-prev").is_enabled())
+        page.locator(".pane-bottom-right").screenshot(path=str(output / "representative-navigation.png"))
+        page.locator("#reachability-prev").click()
+        page.wait_for_function("document.querySelector('#reachability-position')?.textContent === '1 of 2'")
+        check("previous button restores first representative", page.locator("#reachability-next").is_enabled())
         page.screenshot(path=str(output / "medium-two-branches.png"), full_page=False)
         medium_root_index = max(range(len(marker_data(page)["ids"])),
                                 key=lambda i: len(marker_data(page)["groups"][str(marker_data(page)["ids"][i])]))

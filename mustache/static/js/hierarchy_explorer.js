@@ -39,7 +39,7 @@
 
     class HierarchyExplorer {
         constructor() {
-            this.selection = { mpts: null, group_id: null, point_id: null };
+            this.selection = { mpts: null, group_id: null, pruned_id: null, point_id: null };
             this.members = null;
             this.results = null;
             this.params = {};
@@ -70,7 +70,7 @@
         async setData(analysis, results, params) {
             this.results = results;
             this.params = params || {};
-            this.selection = { mpts: null, group_id: null, point_id: null };
+            this.selection = { mpts: null, group_id: null, pruned_id: null, point_id: null };
             this.members = null;
             const ordered = (analysis?.ordered_mpts || []).map(Number);
             this.select.replaceChildren(...ordered.map(value => new Option(`mpts = ${value}`, value)));
@@ -79,6 +79,7 @@
             if (mpts == null) { this.status('No individual hierarchies are available.'); return; }
             await this.open(mpts);
             if (saved.group_id != null) await this.selectGroup(Number(saved.group_id));
+            if (saved.pruned_id != null) await this.selectPruned(Number(saved.pruned_id));
             if (saved.point_id != null) await this.selectPoint(Number(saved.point_id));
         }
 
@@ -87,7 +88,7 @@
             if (!result) { this.status('Select a hierarchy from this analysis.', true); return; }
             ++this.sequence;
             if (this.selection.mpts !== mpts) {
-                this.selection = { mpts, group_id: null, point_id: null };
+                this.selection = { mpts, group_id: null, pruned_id: null, point_id: null };
                 this.members = null;
                 document.getElementById('group-detail').textContent = 'Click a group marker in the tree.';
                 document.getElementById('point-trajectory').textContent = 'Enter an input row index or click a reachability bar.';
@@ -196,48 +197,95 @@
         async drawGroupTree(result) {
             const div = document.getElementById('group-tree-plot');
             const tree = result.group_tree;
-            if (!tree?.groups?.length) {
+            if (!tree?.groups?.length || !result.condensed_tree?.length) {
                 Plotly.purge(div);
                 div.textContent = 'This older project has no condensed tree. Rerun the analysis to explore groups.';
                 return;
             }
             const groups = new Map(tree.groups.map(group => [Number(group.id), group]));
-            const y = new Map(); let nextY = 0;
-            const place = id => {
-                if (y.has(id)) return y.get(id);
-                const children = groups.get(id).child_groups.filter(child => groups.has(child));
-                const value = children.length ? children.map(place).reduce((a, b) => a + b, 0) / children.length : nextY++;
-                y.set(id, value); return value;
-            };
-            place(tree.root);
-            const finite = [...tree.groups.map(group => group.birth_lambda),
-                ...tree.point_departures.map(row => row.lambda_val)].filter(value => Number.isFinite(value));
-            const ceiling = Math.max(1, ...finite);
-            const x = value => value == null ? ceiling * 1.05 : Number(value);
+            const rowsByParent = new Map();
+            for (const row of result.condensed_tree) {
+                const parent = Number(row.parent);
+                if (!rowsByParent.has(parent)) rowsByParent.set(parent, []);
+                rowsByParent.get(parent).push(row);
+            }
+            const order = result.reachability_data?.ordering ||
+                Array.from({ length: tree.n_samples }, (_, index) => index);
+            const leafPosition = new Map(order.map((point, index) => [Number(point), index]));
+            const members = new Map();
+            for (const group of [...tree.groups].sort((a, b) => b.id - a.id)) {
+                const descendants = [];
+                for (const row of rowsByParent.get(group.id) || []) {
+                    const child = Number(row.child);
+                    descendants.push(...(Number(row.child_size) === 1 ? [child] : members.get(child) || []));
+                }
+                if (descendants.length !== Number(group.size_at_birth))
+                    throw new Error(`Condensed group ${group.id} has inconsistent membership.`);
+                members.set(group.id, descendants);
+            }
+            const center = points => points.reduce((total, point) => total + leafPosition.get(point), 0) / points.length;
+            const finite = result.condensed_tree.map(row => row.lambda_val).filter(value => Number.isFinite(value));
+            const ceiling = finite.reduce((highest, value) => Math.max(highest, value), 1);
+            const lambda = row => row.lambda_infinite || row.birth_lambda_infinite
+                ? ceiling * 1.05 : Number(row.lambda_val ?? row.birth_lambda ?? 0);
             const traces = [];
+            // Each filled ribbon spans the exact leaf-order interval of the
+            // points still in this condensed group. Its width decreases when
+            // points depart. This is the HDBSCAN condensed-tree representation,
+            // derived from the already fitted CORE-SG linkage, not a new fit.
             for (const group of tree.groups) {
-                if (group.parent == null || !groups.has(group.parent)) continue;
-                const parent = groups.get(group.parent);
-                traces.push({ type: 'scatter', mode: 'lines', x: [x(parent.birth_lambda), x(group.birth_lambda), x(group.birth_lambda)],
-                    y: [y.get(parent.id), y.get(parent.id), y.get(group.id)],
-                    line: { color: '#4B7183', width: Math.min(8, 1 + Math.sqrt(group.size_at_birth) / 2) },
-                    hoverinfo: 'skip', showlegend: false });
+                const remaining = new Set(members.get(group.id));
+                const events = new Map();
+                for (const row of rowsByParent.get(group.id) || []) {
+                    const value = lambda(row);
+                    if (!events.has(value)) events.set(value, { departing: [], split: false });
+                    if (Number(row.child_size) === 1) events.get(value).departing.push(Number(row.child));
+                    else events.get(value).split = true;
+                }
+                const bandX = [], bandY = [], bandText = [];
+                let previous = lambda(group);
+                for (const [value, event] of [...events].sort((a, b) => a[0] - b[0])) {
+                    if (value > previous && remaining.size) {
+                        const positions = [...remaining].map(point => leafPosition.get(point)).sort((a, b) => a - b);
+                        if (positions.at(-1) - positions[0] + 1 !== positions.length)
+                            throw new Error(`Condensed group ${group.id} is not contiguous in the linkage leaf order.`);
+                        const left = positions[0] - 0.48, right = positions.at(-1) + 0.48;
+                        bandX.push(left, right, right, left, left, null);
+                        bandY.push(previous, previous, value, value, previous, null);
+                        bandText.push(...Array(6).fill(`Group ${group.id}<br>${remaining.size} points remain<br>λ ${lambdaText(previous)} → ${lambdaText(value)}`));
+                    }
+                    for (const point of event.departing) remaining.delete(point);
+                    previous = value;
+                    if (event.split) break;
+                }
+                if (bandX.length) traces.push({ type: 'scatter', mode: 'lines',
+                    x: bandX, y: bandY, text: bandText, fill: 'toself',
+                    fillcolor: group.id === this.selection.group_id ? 'rgba(210,122,22,0.55)' : 'rgba(31,111,95,0.46)',
+                    line: { color: group.id === this.selection.group_id ? '#D27A16' : '#1F6F5F', width: 1 },
+                    hovertemplate: '%{text}<extra></extra>', showlegend: false });
             }
-            const departures = new Map();
-            for (const row of tree.point_departures) {
-                const key = `${row.parent}|${row.lambda_val}|${row.lambda_infinite}`;
-                if (!departures.has(key)) departures.set(key, { parent: row.parent, value: row.lambda_val,
-                    infinite: row.lambda_infinite, points: [] });
-                departures.get(key).points.push(row.child);
-            }
+            const pruned = tree.pruned_subgroups || [];
+            const prunedPoints = new Set(pruned.flatMap(item => item.sample_indices));
+            const departures = tree.point_departures.filter(row => !prunedPoints.has(Number(row.child)));
             traces.push({ type: 'scatter', mode: 'markers', name: 'Points leaving groups',
-                x: [...departures.values()].map(item => x(item.value)),
-                y: [...departures.values()].map(item => y.get(item.parent) ?? 0),
-                text: [...departures.values()].map(item => `${item.points.length} point(s) leave group ${item.parent} at λ = ${lambdaText(item.value, item.infinite)}; input rows: ${item.points.slice(0, 20).join(', ')}${item.points.length > 20 ? '…' : ''}`),
-                marker: { color: '#AAB0B4', size: [...departures.values()].map(item => Math.min(15, 4 + Math.sqrt(item.points.length) * 2)), symbol: 'diamond', opacity: 0.65 },
+                x: departures.map(row => leafPosition.get(Number(row.child))),
+                y: departures.map(lambda),
+                text: departures.map(row => `Input row ${row.child} leaves group ${row.parent} at λ = ${lambdaText(row.lambda_val, row.lambda_infinite)}`),
+                marker: { color: '#AAB0B4', size: 6, symbol: 'diamond', opacity: 0.7 },
                 hovertemplate: '%{text}<extra></extra>' });
+            traces.push({ type: 'scatter', mode: 'markers', name: 'Small linkage subgroups pruned during condensation',
+                x: pruned.map(item => center(item.sample_indices)),
+                y: pruned.map(lambda),
+                customdata: pruned.map(item => item.id),
+                text: pruned.map(item => `Full-linkage subgroup ${item.id}: ${item.size} input points; pruned at λ = ${lambdaText(item.lambda_val, item.lambda_infinite)} because it is below the effective condensation threshold. Click to highlight rows ${item.sample_indices.slice(0, 20).join(', ')}${item.size > 20 ? '…' : ''}.`),
+                marker: { color: pruned.map(item => item.id === this.selection.pruned_id ? '#D27A16' : '#B77929'),
+                    size: pruned.map(item => item.id === this.selection.pruned_id ? 16 : 11),
+                    symbol: 'triangle-down', line: { color: '#FFFFFF', width: 1 } },
+                hovertemplate: '%{text}<extra></extra>',
+                meta: { role: 'pruned-subgroup-targets' } });
             traces.push({ type: 'scatter', mode: 'markers', name: 'Groups (click to select)',
-                x: tree.groups.map(group => x(group.birth_lambda)), y: tree.groups.map(group => y.get(group.id)),
+                x: tree.groups.map(group => center(members.get(group.id))),
+                y: tree.groups.map(lambda),
                 customdata: tree.groups.map(group => group.id),
                 text: tree.groups.map(group => `Group ${group.id} · ${group.size_at_birth} points at birth · λ = ${lambdaText(group.birth_lambda, group.birth_lambda_infinite)}`),
                 marker: { color: tree.groups.map(group => group.id === this.selection.group_id ? '#D27A16' : '#1F6F5F'),
@@ -245,19 +293,37 @@
                 hovertemplate: '%{text}<br>Click to inspect descendants<extra></extra>',
                 meta: { role: 'group-targets' } });
             await Plotly.react(div, traces, {
-                template: 'plotly_white', xaxis: { title: 'λ = 1 / separation distance (not distance)', rangemode: 'tozero' },
-                yaxis: { title: 'Group-tree layout (no numeric meaning)', showticklabels: false },
-                legend: { orientation: 'h', x: 0, y: -0.34, yanchor: 'top' },
-                margin: { t: 25, l: 65, r: 20, b: 130 }, hovermode: 'closest',
+                template: 'plotly_white', xaxis: { title: 'Leaf order · band width = points remaining',
+                    range: [-1, order.length] },
+                yaxis: { title: 'λ = 1 / separation distance', autorange: 'reversed' },
+                legend: { orientation: 'h', x: 0, y: -0.32, yanchor: 'top' },
+                margin: { t: 30, l: 70, r: 20, b: 125 }, hovermode: 'closest',
                 annotations: tree.point_departures.some(row => row.lambda_infinite) ? [{
-                    text: '∞ lambda is plotted at the finite-axis edge', xref: 'paper', yref: 'paper', x: 1, y: 1,
+                    text: '∞ lambda is plotted at the finite-axis edge', xref: 'paper', yref: 'paper', x: 1, y: 0,
                     xanchor: 'right', showarrow: false, font: { size: 10 } }] : [],
             }, { responsive: true, displaylogo: false });
             div.removeAllListeners?.('plotly_click');
             div.on('plotly_click', event => {
                 const point = event.points?.[0];
                 if (point?.data?.meta?.role === 'group-targets') this.selectGroup(Number(point.customdata));
+                if (point?.data?.meta?.role === 'pruned-subgroup-targets') this.selectPruned(Number(point.customdata));
             });
+        }
+
+        async selectPruned(subgroupId) {
+            const mpts = this.selection.mpts;
+            const item = this.results?.[mpts]?.group_tree?.pruned_subgroups?.find(
+                candidate => Number(candidate.id) === subgroupId);
+            if (!item) { this.status('This pruned linkage subgroup is unavailable.', true); return; }
+            this.selection.group_id = null;
+            this.selection.pruned_id = subgroupId;
+            this.members = new Set(item.sample_indices);
+            document.getElementById('group-detail').textContent =
+                `Full-linkage subgroup ${subgroupId} · ${item.size} input rows · pruned from condensed group ${item.parent} at λ = ${lambdaText(item.lambda_val, item.lambda_infinite)} because its size is below the effective condensation threshold. It is not a valid condensed group or a selected flat cluster. Rows: ${item.sample_indices.join(', ')}`;
+            await this.drawReachability(this.results[mpts]);
+            await this.drawIndividualDendrogram(this.results[mpts]);
+            await this.drawGroupTree(this.results[mpts]);
+            this.status(`Pruned linkage subgroup ${subgroupId} selected · ${item.size} points highlighted`);
         }
 
         async selectGroup(groupId) {
@@ -269,6 +335,7 @@
                 if (!response.ok) throw new Error(data.error || 'Unable to load group.');
                 if (sequence !== this.sequence) return;
                 this.selection.group_id = groupId;
+                this.selection.pruned_id = null;
                 this.members = new Set(data.sample_indices);
                 const group = data.group;
                 document.getElementById('group-detail').textContent =
@@ -298,12 +365,12 @@
                 const target = document.getElementById('point-trajectory');
                 target.replaceChildren();
                 const heading = document.createElement('p');
-                heading.textContent = `Input row ${pointId} · final flat label: ${trajectory.flat_label === -1 ? 'noise (−1)' : `cluster ${trajectory.flat_label}`} · singleton departure λ = ${lambdaText(trajectory.point_departure_lambda, trajectory.point_departure_lambda_infinite)}.`;
+                heading.textContent = `Input row ${pointId} · final EOM flat label: ${trajectory.flat_label === -1 ? 'noise (−1)' : `cluster ${trajectory.flat_label}`} · hierarchical noise onset (singleton departure) λ = ${lambdaText(trajectory.hierarchical_noise_onset_lambda ?? trajectory.point_departure_lambda, trajectory.hierarchical_noise_onset_infinite ?? trajectory.point_departure_lambda_infinite)}.`;
                 target.append(heading);
                 const list = document.createElement('ol');
                 trajectory.groups.forEach(group => {
                     const item = document.createElement('li');
-                    item.textContent = `Group ${group.group_id} (${group.size_at_birth} at birth): λ ${lambdaText(group.birth_lambda)} → ${lambdaText(group.exit_lambda, group.exit_lambda_infinite)}; exits to ${group.exit_to === 'subgroup' ? `subgroup ${group.next_group_id}` : 'singleton point'}.`;
+                    item.textContent = `Group ${group.group_id} (${group.size_at_birth} at birth): λ ${lambdaText(group.birth_lambda)} → λₚ ${lambdaText(group.exit_lambda, group.exit_lambda_infinite)} (leaves this group); exits to ${group.exit_to === 'subgroup' ? `subgroup ${group.next_group_id}` : 'singleton point'}.`;
                     list.append(item);
                 });
                 target.append(list);
