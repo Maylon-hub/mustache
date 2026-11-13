@@ -109,7 +109,7 @@ def run_clustering(df, min_cluster_size=5, min_samples=None, metric='euclidean',
     elapsed = time.perf_counter() - start + extra_clustering_time
     labels, probabilities = np.asarray(labels), np.asarray(probabilities)
     condensed_rows = serialize_condensed_tree(condensed)
-    group_tree = group_tree_summary(condensed_rows, len(data), minimum_size)
+    group_tree = group_tree_summary(condensed_rows, len(data), minimum_size, linkage=Z)
     start = time.perf_counter()
     reach = hierarchy_reachability(Z, labels, mpts=mpts, metric=metric)
     reach_time = time.perf_counter() - start

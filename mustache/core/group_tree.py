@@ -4,7 +4,7 @@ Point IDs below are zero-based input row positions. Cluster IDs are HDBSCAN
 internal IDs (at least ``n_samples``); they are never dataset row IDs.
 """
 
-from collections import defaultdict
+from collections import defaultdict, deque
 import math
 
 
@@ -43,8 +43,76 @@ def _index_tree(rows, n_samples):
     return root, by_parent, incoming
 
 
-def group_tree_summary(rows, n_samples, min_cluster_size):
-    """Cluster-only topology plus point departures, without a second fit."""
+def _pruned_linkage_subgroups(linkage, incoming, n_samples, threshold):
+    """Recover the small children pruned by HDBSCAN's tree condensation.
+
+    This only annotates the fitted linkage. It never changes the condensed
+    tree, flat labels, HAI, or the CORE-SG extraction. The replay checks every
+    emitted child against the actual condensed tree so a future HDBSCAN
+    convention change cannot silently misidentify a discarded subgroup.
+    """
+    if len(linkage) != n_samples - 1:
+        raise ValueError('Linkage and condensed tree have different sample counts.')
+
+    def size(node):
+        return 1 if node < n_samples else int(linkage[node - n_samples][3])
+
+    def leaves(node):
+        points, stack = [], [node]
+        while stack:
+            current = stack.pop()
+            if current < n_samples:
+                points.append(current)
+            else:
+                left, right = linkage[current - n_samples][:2]
+                stack.extend((int(left), int(right)))
+        return sorted(points)
+
+    def matches(edge, parent, child_size, value):
+        if edge is None or int(edge['parent']) != parent or int(edge['child_size']) != child_size:
+            return False
+        if math.isinf(value):
+            return bool(edge.get('lambda_infinite'))
+        return not edge.get('lambda_infinite') and math.isclose(
+            float(edge['lambda_val']), value, rel_tol=1e-12, abs_tol=1e-12)
+
+    subgroups = []
+    queue = deque([(2 * n_samples - 2, n_samples)])
+    next_group = n_samples + 1
+    while queue:
+        node, group = queue.popleft()
+        left, right, distance = linkage[node - n_samples][:3]
+        left, right = int(left), int(right)
+        value = 1.0 / float(distance) if distance > 0 else math.inf
+        small = [child for child in (left, right) if size(child) < threshold]
+        large = [child for child in (left, right) if size(child) >= threshold]
+        if len(large) == 2:
+            for child in (left, right):
+                if not matches(incoming.get(next_group), group, size(child), value):
+                    raise ValueError('Linkage and condensed group branches disagree.')
+                queue.append((child, next_group))
+                next_group += 1
+        else:
+            for child in small:
+                points = leaves(child)
+                if any(not matches(incoming.get(point), group, 1, value) for point in points):
+                    raise ValueError('Linkage and condensed point departures disagree.')
+                if len(points) > 1:
+                    subgroups.append({
+                        'id': child, 'id_namespace': 'full_linkage_node',
+                        'parent': group, 'size': len(points),
+                        'sample_indices': points,
+                        'lambda_val': None if math.isinf(value) else value,
+                        'lambda_infinite': math.isinf(value),
+                        'status': 'pruned_below_condensation_threshold',
+                    })
+            if large:
+                queue.append((large[0], group))
+    return subgroups
+
+
+def group_tree_summary(rows, n_samples, min_cluster_size, linkage=None):
+    """Condensed topology, point departures and checked pruned linkage nodes."""
     root, by_parent, incoming = _index_tree(rows, n_samples)
     groups = []
     for group_id in sorted(by_parent):
@@ -60,6 +128,11 @@ def group_tree_summary(rows, n_samples, min_cluster_size):
                              if int(child['child_size']) > 1],
             'point_departures': sum(int(child['child_size']) == 1 for child in children),
         })
+    if linkage is not None and root != n_samples:
+        raise ValueError('Condensed-tree root does not match the linkage sample count.')
+    pruned = (_pruned_linkage_subgroups(linkage, incoming, n_samples,
+                                      int(min_cluster_size) + 1)
+              if linkage is not None else [])
     return {
         'root': root, 'groups': groups, 'n_samples': n_samples,
         'min_cluster_size': int(min_cluster_size),
@@ -67,6 +140,8 @@ def group_tree_summary(rows, n_samples, min_cluster_size):
         # increments the public minimum size before condensing this tree.
         'condensation_threshold': int(min_cluster_size) + 1,
         'point_departures': [row for row in rows if int(row['child_size']) == 1],
+        'pruned_subgroups': pruned,
+        'pruned_subgroups_status': 'reconstructed_and_checked' if linkage is not None else 'not_recorded',
         'method': 'hdbscan-condense-tree-from-fitted-linkage',
         'point_id_convention': 'zero-based input row position, not leaf order',
     }
@@ -130,8 +205,14 @@ def point_trajectory(rows, n_samples, point_id, flat_label):
         'flat_status': 'noise' if int(flat_label) == -1 else 'cluster',
         'groups': path, 'point_departure_lambda': path[-1]['exit_lambda'],
         'point_departure_lambda_infinite': path[-1]['exit_lambda_infinite'],
+        # Hierarchical noise begins when the point leaves its last condensed
+        # group. EOM's final flat noise label is a separate global selection.
+        'hierarchical_noise_onset_lambda': path[-1]['exit_lambda'],
+        'hierarchical_noise_onset_infinite': path[-1]['exit_lambda_infinite'],
+        'flat_noise_transition_lambda': None,
         'root': root,
-        'note': ('A singleton departure ends the point’s membership in the '
-                 'condensed group tree; final noise is determined independently '
-                 'by the flat-cluster selection.'),
+        'note': ('The singleton departure is the hierarchical noise-onset '
+                 'lambda for this condensed tree. The final flat noise label '
+                 'comes from EOM cluster selection and has no separate '
+                 'universal transition lambda.'),
     }

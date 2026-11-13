@@ -49,9 +49,58 @@ def test_point_trajectory_uses_edges_not_final_label():
     assert [node['size_at_birth'] for node in path['groups']] == [4, 2]
     assert [node['exit_lambda'] for node in path['groups']] == [1, 2]
     assert path['flat_status'] == 'noise' and path['point_departure_lambda'] == 2
-    assert point_trajectory(ROWS, 4, 0, flat_label=0)['flat_status'] == 'cluster'
+    assert path['hierarchical_noise_onset_lambda'] == 2
+    assert path['flat_noise_transition_lambda'] is None
+    clustered = point_trajectory(ROWS, 4, 0, flat_label=0)
+    assert clustered['flat_status'] == 'cluster'
+    assert clustered['hierarchical_noise_onset_lambda'] == path['hierarchical_noise_onset_lambda']
+    assert [group['exit_lambda'] for group in clustered['groups']] == [1, 2]
     with pytest.raises(ValueError, match='outside'):
         point_trajectory(ROWS, 4, 4, flat_label=-1)
+
+
+def test_pruned_small_linkage_subgroups_are_exact_and_distinct_from_condensed_groups():
+    linkage = np.array([
+        [0, 1, .1, 2], [2, 3, .2, 2], [8, 9, .5, 4],
+        [4, 5, .1, 2], [6, 7, .2, 2], [11, 12, .5, 4],
+        [10, 13, 2, 8],
+    ], float)
+    rows = [
+        {'parent': 8, 'child': 9, 'lambda_val': .5, 'child_size': 4},
+        {'parent': 8, 'child': 10, 'lambda_val': .5, 'child_size': 4},
+    ] + [
+        {'parent': 9 if point < 4 else 10, 'child': point,
+         'lambda_val': 2.0, 'child_size': 1}
+        for point in range(8)
+    ]
+    summary = group_tree_summary(rows, 8, min_cluster_size=2, linkage=linkage)
+    pruned = summary['pruned_subgroups']
+    assert summary['condensation_threshold'] == 3
+    assert summary['pruned_subgroups_status'] == 'reconstructed_and_checked'
+    assert {tuple(item['sample_indices']) for item in pruned} == {
+        (0, 1), (2, 3), (4, 5), (6, 7)}
+    assert {item['id'] for item in pruned} == {8, 9, 11, 12}
+    assert {item['lambda_val'] for item in pruned} == {2.0}
+    assert all(item['id_namespace'] == 'full_linkage_node' for item in pruned)
+    assert all(item['status'] == 'pruned_below_condensation_threshold' for item in pruned)
+    damaged = [dict(row) for row in rows]
+    damaged[2]['lambda_val'] = 3.0
+    with pytest.raises(ValueError, match='departures disagree'):
+        group_tree_summary(damaged, 8, min_cluster_size=2, linkage=linkage)
+
+
+def test_zero_distance_pruning_preserves_infinite_lambda_and_original_rows():
+    data = pd.DataFrame([[0, 0], [0, 0], [0, 0], [1, 1], [1, 1], [1, 1]])
+    result = run_clustering(data, min_cluster_size=2, min_samples=2, compact=True)
+    tree = result['group_tree']
+    assert tree['pruned_subgroups_status'] == 'reconstructed_and_checked'
+    assert any(item['lambda_infinite'] and item['lambda_val'] is None
+               for item in tree['pruned_subgroups'])
+    departures = {row['child']: row for row in result['condensed_tree']
+                  if row['child_size'] == 1}
+    for item in tree['pruned_subgroups']:
+        assert all(departures[point]['parent'] == item['parent']
+                   for point in item['sample_indices'])
 
 
 def test_reachability_labels_follow_original_rows_after_leaf_reordering():
@@ -96,6 +145,12 @@ def test_core_condensed_tree_and_labels_match_reference_fit(separated):
         tuple((int(row['parent']), int(row['child']), int(row['child_size'])))
         for row in reference.condensed_tree_.to_numpy()}
     assert len(group_members(result['condensed_tree'], len(separated), result['group_tree']['root'])) == len(separated)
+    for subgroup in result['group_tree']['pruned_subgroups']:
+        assert 1 < subgroup['size'] < result['condensation_threshold']
+        assert subgroup['size'] == len(subgroup['sample_indices'])
+        assert set(subgroup['sample_indices']).issubset(set(range(len(separated))))
+        assert all(next(row for row in result['condensed_tree'] if row['child'] == point)['parent'] ==
+                   subgroup['parent'] for point in subgroup['sample_indices'])
 
 
 def test_no_valid_flat_clusters_remains_genuine_noise(separated):
@@ -137,6 +192,19 @@ def test_single_flat_cluster_is_not_misidentified_as_noise():
     assert reach['ordering'] != [0, 1, 2, 3]
 
 
+def test_real_core_sg_single_flat_cluster_and_noise_keep_original_point_ids():
+    rng = np.random.default_rng(6)
+    points = np.vstack([rng.normal(0, .1, (30, 2)), rng.uniform(3, 8, (4, 2))])
+    result = run_clustering(pd.DataFrame(points), min_cluster_size=7,
+                            min_samples=3, compact=True)
+    assert result['n_clusters'] == 1
+    assert result['noise_points'] > 0
+    assert len(set(result['labels']) - {-1}) == 1
+    reach = result['reachability_data']
+    assert reach['labels'] == np.asarray(result['labels'])[reach['ordering']].tolist()
+    assert any(label >= 0 for label in reach['labels'])
+
+
 def test_three_flat_clusters_and_noise_survive_leaf_reordering():
     linkage = np.array([[0, 2, .1, 2], [1, 3, .3, 3], [4, 5, .7, 4]], float)
     labels = np.array([-1, 0, 1, 2])
@@ -159,6 +227,7 @@ def test_batch_api_group_point_save_reload_and_export(flask_client, separated):
     assert body['params']['min_cluster_size'] == 7
     assert body['params']['min_cluster_size_mode'] == 'explicit'
     assert body['results']['2']['min_samples'] == 2
+    assert body['results']['2']['group_tree']['pruned_subgroups_status'] == 'reconstructed_and_checked'
     root = body['results']['2']['group_tree']['root']
     group = flask_client.get(f'/api/hierarchies/2/groups/{root}')
     assert group.status_code == 200
