@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MustaCHE · CORE-SG preview</title>
+    <style>
+        body { font: 1rem/1.5 system-ui, sans-serif; color: #18302b; background: #f3f8f6; margin: 0; }
+        main { width: min(46rem, 90%); margin: 2.5rem auto; }
+        h1, h2 { line-height: 1.15; }
+        button { font: inherit; padding: .55rem 1rem; border: 0; border-radius: .3rem;
+                 background: #175b4d; color: white; cursor: pointer; }
+        section { margin-block: 2rem; }
+        table { width: 100%; border-collapse: collapse; background: white; font-variant-numeric: tabular-nums; }
+        th, td { text-align: center; padding: .4rem; border-bottom: 1px solid #cfdcd8; }
+        .table-scroll { overflow-x: auto; }
+    </style>
+</head>
+<body>
+<main>
+    <h1>MustaCHE · CORE-SG preview</h1>
+    <p>Run the built-in Iris dataset through CORE-SG with Euclidean distance and mpts values 2, 4, 6, 8, and 10.</p>
+    <p>This preview runs in a single request. To upload data, save projects or explore the interactive dendrogram, run the full application locally.</p>
+    <form method="post" action="/iris">
+        <button type="submit">Run Iris example</button>
+    </form>
+    {% if rows %}
+    <section aria-labelledby="hierarchies-heading">
+        <h2 id="hierarchies-heading">Hierarchies</h2>
+        <div class="table-scroll">
+            <table>
+                <thead><tr><th scope="col">mpts</th><th scope="col">Flat clusters</th><th scope="col">Noise points</th><th scope="col">Condensed tree edges</th></tr></thead>
+                <tbody>
+                {% for mpts, clusters, noise, edges in rows %}
+                <tr><th scope="row">{{ mpts }}</th><td>{{ clusters }}</td><td>{{ noise }}</td><td>{{ edges }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <section aria-labelledby="hai-heading">
+        <h2 id="hai-heading">HAI Similarity Matrix</h2>
+        <div class="table-scroll">
+            <table>
+                <thead><tr><th scope="col">mpts</th>{% for row in rows %}<th scope="col">{{ row[0] }}</th>{% endfor %}</tr></thead>
+                <tbody>
+                {% for scores in matrix %}
+                <tr><th scope="row">{{ rows[loop.index0][0] }}</th>{% for score in scores %}<td>{{ "%.4f"|format(score) }}</td>{% endfor %}</tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+</main>
+</body>
+</html>

@@ -1,0 +1,48 @@
+name: MustaCHE Docker preview
+
+on:
+  push:
+    branches: [deploy/vercel-preview]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  container:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build Linux x86-64 image
+        run: docker build --platform linux/amd64 -f Dockerfile.vercel -t mustache-preview .
+      - name: Test hosted Iris preview
+        run: |
+          set -euo pipefail
+          trap 'docker logs mustache-hosted || true; docker rm -f mustache-hosted || true' EXIT
+          docker run -d --name mustache-hosted --read-only --tmpfs /tmp -p 127.0.0.1:8080:8080 mustache-preview
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 --max-time 10 http://127.0.0.1:8080/healthz > health.json
+          python -c '
+          import json
+          from pathlib import Path
+
+          health = json.loads(Path("health.json").read_text())
+          assert health["mode"] == "preview"
+          assert health["python"].startswith("3.11.")
+          assert health["core_sg"] == "0.4.5"
+          assert health["native_extensions"] == ["core_sg._mst_kruskal", "core_sg._reweight"]
+          '
+          curl --fail --silent --show-error http://127.0.0.1:8080/ | grep -F 'Run Iris example'
+          curl --fail --silent --show-error --max-time 90 -X POST http://127.0.0.1:8080/iris > iris.html
+          grep -F 'HAI Similarity Matrix' iris.html
+          grep -F '<th scope="row">10</th>' iris.html
+          test "$(curl --silent -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/projects)" = 404
+      - name: Test full local dashboard
+        run: |
+          set -euo pipefail
+          trap 'docker logs mustache-local || true; docker rm -f mustache-local || true' EXIT
+          docker run -d --name mustache-local -e MUSTACHE_CONTAINER_MODE=local -p 127.0.0.1:8080:8080 mustache-preview
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 --max-time 10 http://127.0.0.1:8080/ > dashboard.html
+          grep -F 'Hierarchy Explorer' dashboard.html

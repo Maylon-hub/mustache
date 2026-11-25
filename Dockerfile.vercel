@@ -1,0 +1,37 @@
+FROM python:3.11-slim-bookworm AS build
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+WORKDIR /src
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
+# Install the exact qualified Linux wheel. Resolve everything else on PyPI.
+RUN pip download --no-cache-dir --index-url https://test.pypi.org/simple/ \
+        --only-binary=:all: --no-deps --dest /tmp/core-wheel core-sg-mustache==0.4.5 \
+    && echo "ca5117f88f1322b2efc6ee7ef34923dd5aa944d2ed084613f903239097b50032  /tmp/core-wheel/core_sg_mustache-0.4.5-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl" | sha256sum --check \
+    && pip install --no-cache-dir --no-deps /tmp/core-wheel/*.whl
+
+COPY pyproject.toml README.md LICENSE CITATION.cff CHANGELOG.md AUTHORS.md AUTHORSHIP_APPROVAL_REQUIRED.md DATASETS.md RELEASE_NOTES.md MANIFEST.in ./
+COPY mustache/ mustache/
+RUN pip install --no-cache-dir --index-url https://pypi.org/simple/ \
+        --only-binary=:all: . gunicorn==27.0.1 \
+    && pip check
+
+FROM python:3.11-slim-bookworm
+
+ENV PATH="/opt/venv/bin:${PATH}" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    NUMBA_CACHE_DIR=/tmp/mustache-numba \
+    MUSTACHE_PROJECTS_DIR=/data/projects \
+    MUSTACHE_CONTAINER_MODE=preview \
+    PORT=8080
+WORKDIR /app
+COPY --from=build /opt/venv /opt/venv
+COPY deploy/vercel_preview.py /app/vercel_preview.py
+COPY deploy/vercel_preview.html /app/templates/vercel_preview.html
+RUN mkdir -p /data/projects && chown -R 10001:10001 /data
+USER 10001:10001
+EXPOSE 8080
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers 1 --timeout 120 'vercel_preview:create_app()'"]
