@@ -16,4 +16,5 @@ mustache/**/__pycache__/
 mustache/**/.env*
 !deploy/
 !deploy/vercel_preview.py
-!deploy/vercel_preview.html
+!deploy/templates/
+!deploy/templates/vercel_preview.html

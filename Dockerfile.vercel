@@ -30,7 +30,7 @@ ENV PATH="/opt/venv/bin:${PATH}" \
 WORKDIR /app
 COPY --from=build /opt/venv /opt/venv
 COPY deploy/vercel_preview.py /app/vercel_preview.py
-COPY deploy/vercel_preview.html /app/templates/vercel_preview.html
+COPY deploy/templates/vercel_preview.html /app/templates/vercel_preview.html
 RUN mkdir -p /data/projects && chown -R 10001:10001 /data
 USER 10001:10001
 EXPOSE 8080
