@@ -23,7 +23,7 @@ jobs:
           set -euo pipefail
           trap 'docker logs mustache-hosted || true; docker rm -f mustache-hosted || true' EXIT
           docker run -d --name mustache-hosted --read-only --tmpfs /tmp -p 127.0.0.1:8080:8080 mustache-preview
-          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 --max-time 10 http://127.0.0.1:8080/healthz > health.json
+          curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 1 --retry-max-time 45 --max-time 10 http://127.0.0.1:8080/healthz > health.json
           python -c '
           import json
           from pathlib import Path
@@ -44,5 +44,5 @@ jobs:
           set -euo pipefail
           trap 'docker logs mustache-local || true; docker rm -f mustache-local || true' EXIT
           docker run -d --name mustache-local -e MUSTACHE_CONTAINER_MODE=local -p 127.0.0.1:8080:8080 mustache-preview
-          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 --max-time 10 http://127.0.0.1:8080/ > dashboard.html
+          curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 1 --retry-max-time 45 --max-time 10 http://127.0.0.1:8080/ > dashboard.html
           grep -F 'Hierarchy Explorer' dashboard.html
